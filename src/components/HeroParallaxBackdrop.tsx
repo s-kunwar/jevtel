@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 
 interface HeroParallaxBackdropProps {
   containerRef: RefObject<HTMLElement | null>;
+  darkMode?: boolean;
 }
 
 interface DustMote {
@@ -49,7 +50,8 @@ function drawDustMotes(
   motes: DustMote[],
   width: number,
   height: number,
-  elapsedSec: number
+  elapsedSec: number,
+  isDarkMode: boolean
 ): void {
   ctx.clearRect(0, 0, width, height);
 
@@ -61,11 +63,18 @@ function drawDustMotes(
 
     const rOuter = m.radius * 2.8;
     const grad = ctx.createRadialGradient(px, py, 0, px, py, rOuter);
-    const r = Math.round(244 + m.warmth * 11);
-    const g = Math.round(222 + m.warmth * 16);
-    const b = Math.round(176 + m.warmth * 24);
-    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${m.alpha.toFixed(3)})`);
-    grad.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${(m.alpha * 0.42).toFixed(3)})`);
+    const r = isDarkMode
+      ? Math.round(244 + m.warmth * 11)
+      : Math.round(212 + m.warmth * 22);
+    const g = isDarkMode
+      ? Math.round(222 + m.warmth * 16)
+      : Math.round(156 + m.warmth * 24);
+    const b = isDarkMode
+      ? Math.round(176 + m.warmth * 24)
+      : Math.round(58 + m.warmth * 26);
+    const alpha = isDarkMode ? m.alpha : m.alpha * 0.72;
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`);
+    grad.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${(alpha * 0.42).toFixed(3)})`);
     grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
 
     ctx.fillStyle = grad;
@@ -75,11 +84,16 @@ function drawDustMotes(
   }
 }
 
-export function HeroParallaxBackdrop({ containerRef }: HeroParallaxBackdropProps) {
+export function HeroParallaxBackdrop({
+  containerRef,
+  darkMode = false,
+}: HeroParallaxBackdropProps) {
   const layer1Ref = useRef<HTMLDivElement | null>(null);
   const layer2Ref = useRef<HTMLDivElement | null>(null);
   const layer3Ref = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const darkModeRef = useRef<boolean>(darkMode);
+  darkModeRef.current = darkMode;
 
   useEffect(() => {
     const heroEl = containerRef.current;
@@ -153,7 +167,7 @@ export function HeroParallaxBackdrop({ containerRef }: HeroParallaxBackdropProps
 
       if (prefersReducedMotion) {
         applyTransforms(0, 0);
-        drawDustMotes(ctx, motes, width, height, 0);
+        drawDustMotes(ctx, motes, width, height, 0, darkModeRef.current);
       }
     };
 
@@ -189,7 +203,7 @@ export function HeroParallaxBackdrop({ containerRef }: HeroParallaxBackdropProps
         if (m.x < -16) m.x = width + 16;
       }
 
-      drawDustMotes(ctx, motes, width, height, elapsedSec);
+      drawDustMotes(ctx, motes, width, height, elapsedSec, darkModeRef.current);
       rafId = window.requestAnimationFrame(tick);
     };
 
@@ -233,7 +247,7 @@ export function HeroParallaxBackdrop({ containerRef }: HeroParallaxBackdropProps
         currentNormX = 0;
         currentNormY = 0;
         applyTransforms(0, 0);
-        drawDustMotes(ctx, motes, width, height, 0);
+        drawDustMotes(ctx, motes, width, height, 0, darkModeRef.current);
       } else {
         startLoop();
       }
@@ -262,7 +276,7 @@ export function HeroParallaxBackdrop({ containerRef }: HeroParallaxBackdropProps
 
     if (prefersReducedMotion) {
       applyTransforms(0, 0);
-      drawDustMotes(ctx, motes, width, height, 0);
+      drawDustMotes(ctx, motes, width, height, 0, darkModeRef.current);
     } else {
       startLoop();
     }
@@ -281,26 +295,26 @@ export function HeroParallaxBackdrop({ containerRef }: HeroParallaxBackdropProps
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#0A0C0B]"
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#F8FAFC] transition-colors duration-200 dark:bg-[#0A0C0B]"
     >
-      {/* Layer 1 — Base Scene (max shift ±10px, opacity 0.35, grayscale 15%, scale 1.06) */}
+      {/* Layer 1 — Base Scene (max shift ±10px, light opacity 0.18 / dark vivid opacity 0.75, scale 1.06) */}
       <div
         ref={layer1Ref}
         className="absolute inset-0 will-change-transform"
       >
         <img
-          src="/tlou-bg.jpg"
+          src="/assets/aistudio/hero_ruins_backdrop.webp"
           alt=""
-          className="h-full w-full scale-[1.06] object-cover object-center opacity-[0.35] grayscale-[15%]"
+          className="h-full w-full scale-[1.06] object-cover object-center opacity-[0.18] grayscale-[15%] transition-opacity duration-200 dark:opacity-[0.75] dark:grayscale-0"
         />
       </div>
 
-      {/* Layer 2 — Window Light Beam from top-right toward center (max shift ±16px, opacity 0.14) */}
+      {/* Layer 2 — Soft Warm Sunlight Beam from top-right toward center (max shift ±16px) */}
       <div
         ref={layer2Ref}
         className="absolute -inset-8 will-change-transform"
       >
-        <div className="h-full w-full opacity-[0.14] blur-2xl bg-[radial-gradient(ellipse_75%_60%_at_84%_8%,rgba(255,241,200,0.95)_0%,rgba(244,214,152,0.52)_34%,rgba(190,175,130,0.12)_64%,transparent_86%),linear-gradient(215deg,rgba(255,238,195,0.85)_0%,rgba(235,205,145,0.34)_38%,transparent_72%)]" />
+        <div className="h-full w-full opacity-[0.38] blur-2xl transition-opacity duration-200 dark:opacity-[0.14] bg-[radial-gradient(ellipse_75%_60%_at_84%_8%,rgba(255,241,200,0.95)_0%,rgba(244,214,152,0.52)_34%,rgba(190,175,130,0.12)_64%,transparent_86%),linear-gradient(215deg,rgba(255,238,195,0.85)_0%,rgba(235,205,145,0.34)_38%,transparent_72%)]" />
       </div>
 
       {/* Layer 3 — Drifting Dust Motes Canvas (max shift ±24px) */}
@@ -311,8 +325,11 @@ export function HeroParallaxBackdrop({ containerRef }: HeroParallaxBackdropProps
         <canvas ref={canvasRef} className="block h-full w-full" />
       </div>
 
-      {/* Readability Guard — Dark Radial Vignette Overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(10,12,11,0.40)_0%,rgba(10,12,11,0.92)_100%)]" />
+      {/* Readability Guard — Theme-Aware Frosted Light Overlay / Subtle Dark Edge Vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(248,250,252,0.78)_0%,rgba(248,250,252,0.96)_100%)] transition-colors duration-200 dark:bg-[radial-gradient(ellipse_at_center,rgba(10,12,11,0.10)_0%,rgba(11,17,32,0.46)_68%,rgba(11,17,32,0.88)_100%)]" />
+
+      {/* Dark Mode Left-Column Text Contrast Scrim (keeps right ruins vivid behind 3D cabinet) */}
+      <div className="hidden dark:block absolute inset-y-0 left-0 w-full lg:w-[60%] bg-gradient-to-r from-[#0B1120]/72 via-[#0B1120]/34 to-transparent" />
     </div>
   );
 }

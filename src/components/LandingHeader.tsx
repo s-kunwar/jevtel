@@ -1,4 +1,4 @@
-import { MessageSquareText, Moon, Sun, Volume2, VolumeX } from 'lucide-react';
+import { Gamepad2, MessageSquareText, Volume2, VolumeX } from 'lucide-react';
 
 interface LandingHeaderProps {
   onPlayQuest: () => void;
@@ -84,9 +84,9 @@ export function LandingHeader({
             onClick={onToggleDarkMode}
             aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#374151] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#111827] dark:text-[#E2E8F0] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8] shrink-0"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#0068B5]/35 bg-white text-[#0068B5] shadow-[0_0_12px_rgba(0,104,181,0.22)] transition-all duration-200 hover:border-[#0068B5] hover:shadow-[0_0_16px_rgba(0,104,181,0.38)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0068B5] dark:border-[#38BDF8]/50 dark:bg-[#0F172A] dark:text-[#38BDF8] dark:shadow-[0_0_14px_rgba(56,189,248,0.36)] dark:hover:border-[#38BDF8] dark:hover:shadow-[0_0_20px_rgba(56,189,248,0.55)] dark:focus-visible:outline-[#38BDF8] shrink-0"
           >
-            {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <Gamepad2 className="h-[18px] w-[18px] drop-shadow-[0_0_6px_rgba(0,104,181,0.45)] dark:drop-shadow-[0_0_8px_rgba(56,189,248,0.75)]" />
           </button>
 
           <button

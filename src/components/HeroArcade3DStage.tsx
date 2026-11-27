@@ -104,9 +104,14 @@ const _screenForward = new THREE.Vector3();
 const _diveStartPos = new THREE.Vector3();
 const _diveStartTarget = new THREE.Vector3();
 const _pointerNdc = new THREE.Vector2();
+const _hoverOffset = new THREE.Vector3();
+const _hoverSpherical = new THREE.Spherical();
 
 const HOME_CAM_POS = new THREE.Vector3(2.38, 2.48, 4.22);
 const HOME_LOOK_AT = new THREE.Vector3(0, 1.48, 0.06);
+const HOME_SPHERICAL = new THREE.Spherical().setFromVector3(
+  HOME_CAM_POS.clone().sub(HOME_LOOK_AT)
+);
 const HOME_FOV = 38;
 const DIVE_FOV = 54;
 // 1.0s snappy ease-out camera dive + 0.5s modal expand = 1.5s combined
@@ -791,6 +796,7 @@ export function HeroArcade3DStage({
     cssRenderer.domElement.style.zIndex = '1';
     cssRenderer.domElement.style.pointerEvents = 'none';
     cssRenderer.domElement.style.overflow = 'hidden';
+    cssRenderer.domElement.style.background = 'transparent';
     container.appendChild(cssRenderer.domElement);
 
     renderer.domElement.style.position = 'absolute';
@@ -799,6 +805,7 @@ export function HeroArcade3DStage({
     renderer.domElement.style.display = 'block';
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
+    renderer.domElement.style.background = 'transparent';
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
@@ -1577,15 +1584,32 @@ export function HeroArcade3DStage({
     };
     triggerLaunchRef.current = startCabinetLaunch;
 
-    // Pointer drag-vs-click guard so OrbitControls drag works smoothly across CRT too
+    // Pointer drag-vs-click guard + smooth hover-orbit tracking
+    const isTouchOrMobile =
+      (window.matchMedia?.('(pointer: coarse)')?.matches ?? false) ||
+      navigator.maxTouchPoints > 0;
     let downX = 0;
     let downY = 0;
     let lastHoverCheck = 0;
+    let isPointerInside = false;
+    let hoverTargetX = 0;
+    let hoverTargetY = 0;
+    let isManualDragging = false;
+
+    const onControlsStart = () => {
+      isManualDragging = true;
+    };
+    const onControlsEnd = () => {
+      isManualDragging = false;
+    };
+    controls.addEventListener('start', onControlsStart);
+    controls.addEventListener('end', onControlsEnd);
 
     const updatePointerNdc = (ev: PointerEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
-      _pointerNdc.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-      _pointerNdc.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      if (rect.width <= 0 || rect.height <= 0) return;
+      _pointerNdc.x = Math.max(-1, Math.min(1, ((ev.clientX - rect.left) / rect.width) * 2 - 1));
+      _pointerNdc.y = Math.max(-1, Math.min(1, -((ev.clientY - rect.top) / rect.height) * 2 + 1));
     };
 
     const onPointerDown = (ev: PointerEvent) => {
@@ -1595,11 +1619,18 @@ export function HeroArcade3DStage({
 
     const onPointerMove = (ev: PointerEvent) => {
       if (launchState === 'launching') return;
+
+      updatePointerNdc(ev);
+      if (ev.pointerType !== 'touch') {
+        isPointerInside = true;
+        hoverTargetX = _pointerNdc.x;
+        hoverTargetY = _pointerNdc.y;
+      }
+
       const now = performance.now();
       if (now - lastHoverCheck < 45) return;
       lastHoverCheck = now;
 
-      updatePointerNdc(ev);
       raycaster.setFromCamera(_pointerNdc, camera);
       const hits = raycaster.intersectObjects(interactiveMeshes, false);
       const nextHovered = hits.length > 0;
@@ -1610,6 +1641,9 @@ export function HeroArcade3DStage({
     };
 
     const onPointerLeave = () => {
+      isPointerInside = false;
+      hoverTargetX = 0;
+      hoverTargetY = 0;
       if (isHovered) {
         isHovered = false;
         setHoveredPart(false);
@@ -1763,7 +1797,36 @@ export function HeroArcade3DStage({
           const targetHoverTilt = isHovered ? Math.sin(elapsedTotal * 8) * 0.08 : 0;
           joyTiltX += (targetHoverTilt - joyTiltX) * Math.min(1, dt * 8);
           joyTiltZ += ((isHovered ? -0.08 : 0) - joyTiltZ) * Math.min(1, dt * 8);
-          controls.update();
+
+          if (!isManualDragging && !isTouchOrMobile) {
+            const targetTheta = isPointerInside
+              ? THREE.MathUtils.clamp(0.18 + hoverTargetX * 0.62, -0.78, 0.80)
+              : HOME_SPHERICAL.theta;
+            const targetPhi = isPointerInside
+              ? THREE.MathUtils.clamp(HOME_SPHERICAL.phi - hoverTargetY * 0.16, 0.92, 1.50)
+              : HOME_SPHERICAL.phi;
+
+            _hoverOffset.copy(camera.position).sub(controls.target);
+            _hoverSpherical.setFromVector3(_hoverOffset);
+            _hoverSpherical.theta = THREE.MathUtils.damp(
+              _hoverSpherical.theta,
+              targetTheta,
+              5.2,
+              dt
+            );
+            _hoverSpherical.phi = THREE.MathUtils.damp(_hoverSpherical.phi, targetPhi, 5.2, dt);
+            _hoverSpherical.radius = THREE.MathUtils.damp(
+              _hoverSpherical.radius,
+              HOME_SPHERICAL.radius,
+              5.2,
+              dt
+            );
+            _hoverOffset.setFromSpherical(_hoverSpherical);
+            camera.position.copy(controls.target).add(_hoverOffset);
+            camera.lookAt(controls.target);
+          } else {
+            controls.update();
+          }
         } else {
           // 1.0s Snappy Ease-Out Camera Dive + CRT Flash
           launchElapsed += dt;
@@ -1869,6 +1932,8 @@ export function HeroArcade3DStage({
         ytPlayerRef.current = null;
       }
 
+      controls.removeEventListener('start', onControlsStart);
+      controls.removeEventListener('end', onControlsEnd);
       controls.dispose();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
@@ -1920,17 +1985,14 @@ export function HeroArcade3DStage({
 
   return (
     <div
-      className={`relative h-full min-h-[430px] w-full overflow-hidden rounded-2xl border-2 transition-colors duration-200 ${
-        darkMode
-          ? 'border-[#334155] bg-[#0B1220] shadow-[6px_6px_0px_#020617]'
-          : 'border-[#111827] bg-[#FAF8F5] shadow-[6px_6px_0px_#111827]'
-      }`}
+      data-theme-mode={darkMode ? 'dark' : 'light'}
+      className="relative h-full min-h-[430px] w-full overflow-hidden bg-transparent"
     >
       {/* Dedicated WebGL + Synced CSS3D Mount Container */}
       <div
         ref={mountRef}
-        className={`relative h-full min-h-[430px] w-full ${hoveredPart ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
-        aria-label="Interactive 3D Intel Core Ultra Arcade Machine. Drag to rotate or click the screen or buttons to launch gameplay."
+        className={`relative h-full min-h-[430px] w-full bg-transparent ${hoveredPart ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
+        aria-label="Interactive 3D Intel Core Ultra Arcade Machine. Hover to orbit or click the screen or buttons to launch gameplay."
       />
 
       {/* Discreet Corner Video Audio Toggle */}
@@ -1939,7 +2001,7 @@ export function HeroArcade3DStage({
           type="button"
           data-crt-audio-toggle="true"
           onClick={handleToggleVideoAudio}
-          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg border border-[#111827]/20 bg-[#FAF8F5] px-2.5 py-1.5 text-[11px] font-bold text-[#111827] shadow-xs transition-colors hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#111827] dark:text-[#F8FAFC] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
+          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white/75 px-3 py-1.5 text-[11px] font-bold text-slate-900 shadow-xs backdrop-blur-md transition-colors hover:border-[#0068B5]/40 hover:text-[#0068B5] dark:border-white/15 dark:bg-slate-950/60 dark:text-white dark:hover:border-[#38BDF8]/50 dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
         >
           {globalMuted || videoMuted ? (
             <>
@@ -1955,10 +2017,10 @@ export function HeroArcade3DStage({
         </button>
       )}
 
-      {/* Minimal Outer-Corner Controls (Zero backdrop-blur over WebGL) */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-lg border border-[#111827]/20 bg-[#FAF8F5] px-2.5 py-1.5 text-[11px] font-bold text-[#374151] shadow-xs dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] whitespace-nowrap shrink-0">
+      {/* Theme-Aware Floating HUD Pills */}
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white/75 px-3 py-1.5 text-[11px] font-bold text-slate-900 shadow-xs backdrop-blur-md transition-colors dark:border-white/15 dark:bg-slate-950/60 dark:text-white whitespace-nowrap shrink-0">
         <Rotate3d className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
-        <span>Drag to rotate</span>
+        <span>Hover to orbit</span>
       </div>
 
       <button
@@ -1968,9 +2030,9 @@ export function HeroArcade3DStage({
           cutVideoForLaunch();
           onRequestLaunch();
         }}
-        className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-2 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-3.5 py-1.5 text-xs font-bold text-white shadow-[2px_2px_0px_#111827] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#005291] dark:border-[#38BDF8] whitespace-nowrap shrink-0"
+        className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white/75 px-3.5 py-1.5 text-xs font-bold text-slate-900 shadow-xs backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-[#0068B5]/40 hover:text-[#0068B5] dark:border-white/15 dark:bg-slate-950/60 dark:text-white dark:hover:border-[#38BDF8]/50 dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
       >
-        <Play className="h-3.5 w-3.5 fill-white" />
+        <Play className="h-3.5 w-3.5 fill-[#0068B5] text-[#0068B5] dark:fill-[#38BDF8] dark:text-[#38BDF8]" />
         <span>Play Arcade</span>
       </button>
     </div>
