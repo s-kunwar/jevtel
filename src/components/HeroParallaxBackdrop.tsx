@@ -305,6 +305,8 @@ export function HeroParallaxBackdrop({
         <img
           src="/assets/aistudio/hero_ruins_backdrop.webp"
           alt=""
+          loading="eager"
+          decoding="sync"
           className="h-full w-full scale-[1.06] object-cover object-center opacity-[0.18] grayscale-[15%] transition-opacity duration-200 dark:opacity-[0.75] dark:grayscale-0"
         />
       </div>

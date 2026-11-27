@@ -27,7 +27,22 @@ export interface NovaChatMessage {
   viaVoice?: boolean;
 }
 
+export interface NovaFastModeProfile {
+  primaryLife: string;
+  secondaryLife?: string;
+  priorities: string[];
+  budgetLabel: string;
+  storeFilter: string;
+  matchedModel: string;
+  matchedSku: string;
+  matchedRetailer: string;
+  matchedPrice: string;
+  stretchModel?: string;
+  activeShowdownRound: string;
+}
+
 export interface NovaKioskContext {
+  appMode?: 'fast' | 'pro';
   hasCompletedQuest: boolean;
   matchSource: 'builder' | 'quest';
   processorLabel: string;
@@ -36,6 +51,7 @@ export interface NovaKioskContext {
   storageLabel: string;
   scenarioLabel: string;
   matchedTierName: string;
+  fastModeProfile?: NovaFastModeProfile;
 }
 
 interface NovaAdvisorChatProps {
@@ -51,13 +67,26 @@ type VoiceState = 'idle' | 'connecting' | 'listening' | 'speaking';
 
 const STORAGE_KEY = 'jevtel_nova_history_v1';
 
-const INITIAL_GREETING: NovaChatMessage = {
+const FAST_INITIAL_GREETING: NovaChatMessage = {
+  id: 'nova-welcome',
+  role: 'model',
+  text: `Hey! I'm **NOVA**, your store shopping friend. Ask me anything in plain English—like whether a laptop lasts 4 years or runs Tally and Canva without lag!`,
+};
+
+const PRO_INITIAL_GREETING: NovaChatMessage = {
   id: 'nova-welcome',
   role: 'model',
   text: `Hey! I'm **NOVA**, your Intel AI PC advisor here at the kiosk. Type or tap **Voice** to talk—tell me what you'll mostly use your laptop for (college, editing, gaming, or daily multitasking) and your rough budget!`,
 };
 
-const QUICK_STARTERS = [
+const FAST_QUICK_STARTERS = [
+  'Will this last 4 years?',
+  'Why not a ₹55k laptop instead?',
+  'Does AI work without internet?',
+  'Will it run Tally, Canva & Photoshop?',
+];
+
+const PRO_QUICK_STARTERS = [
   'Best laptop for college & AI?',
   'Why Core Ultra vs a cheaper laptop?',
   'Need one for editing & gaming',
@@ -193,8 +222,12 @@ export function NovaAdvisorChat({
   queuedPrompt,
   kioskContext,
 }: NovaAdvisorChatProps) {
+  const isFastMode = kioskContext.appMode === 'fast';
+  const defaultGreeting = isFastMode ? FAST_INITIAL_GREETING : PRO_INITIAL_GREETING;
+  const activeQuickStarters = isFastMode ? FAST_QUICK_STARTERS : PRO_QUICK_STARTERS;
+
   const [messages, setMessages] = useState<NovaChatMessage[]>(() => {
-    if (typeof window === 'undefined') return [INITIAL_GREETING];
+    if (typeof window === 'undefined') return [defaultGreeting];
     try {
       const saved = window.sessionStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -204,7 +237,7 @@ export function NovaAdvisorChat({
     } catch {
       // ignore storage read failure
     }
-    return [INITIAL_GREETING];
+    return [defaultGreeting];
   });
 
   const [input, setInput] = useState('');
@@ -355,7 +388,7 @@ export function NovaAdvisorChat({
     if (sessionNonce !== lastProcessedNonceRef.current) {
       lastProcessedNonceRef.current = sessionNonce;
       stopVoiceSession();
-      setMessages([INITIAL_GREETING]);
+      setMessages([defaultGreeting]);
       setInput('');
       setErrorMsg(null);
       try {
@@ -364,7 +397,16 @@ export function NovaAdvisorChat({
         // ignore
       }
     }
-  }, [sessionNonce, stopVoiceSession]);
+  }, [sessionNonce, stopVoiceSession, defaultGreeting]);
+
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].id === 'nova-welcome' && prev[0].text !== defaultGreeting.text) {
+        return [defaultGreeting];
+      }
+      return prev;
+    });
+  }, [defaultGreeting]);
 
   useEffect(() => {
     if (open && scrollRef.current) {
@@ -721,7 +763,7 @@ export function NovaAdvisorChat({
   const handleResetChat = () => {
     if (isSending) return;
     stopVoiceSession();
-    setMessages([INITIAL_GREETING]);
+    setMessages([defaultGreeting]);
     setErrorMsg(null);
     setInput('');
     try {
@@ -797,13 +839,24 @@ export function NovaAdvisorChat({
           : 'Listening · Speak naturally';
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 sm:bottom-6 sm:right-6">
+    <div
+      className={
+        open
+          ? 'fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/55 backdrop-blur-xs sm:inset-auto sm:bottom-6 sm:right-6 sm:z-40 sm:block sm:bg-transparent sm:backdrop-blur-none'
+          : 'fixed bottom-4 right-4 z-40 safe-pb sm:bottom-6 sm:right-6 sm:pb-0'
+      }
+      onClick={(e) => {
+        if (open && e.target === e.currentTarget) {
+          onOpenChange(false);
+        }
+      }}
+    >
       {!open ? (
         <button
           type="button"
           onClick={() => onOpenChange(true)}
           aria-label="Open NOVA AI PC Advisor chat"
-          className="group flex items-center gap-3 rounded-xl border-2 border-[#111827] bg-white px-4 py-2.5 text-left shadow-[4px_4px_0px_#0068B5] transition-transform duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 dark:border-[#38BDF8] dark:bg-[#111827] dark:shadow-[4px_4px_0px_#020617]"
+          className="group flex min-h-[48px] items-center gap-2.5 rounded-xl border-2 border-[#111827] bg-white px-3.5 py-2 text-left shadow-[4px_4px_0px_#0068B5] transition-transform duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 dark:border-[#38BDF8] dark:bg-[#111827] dark:shadow-[4px_4px_0px_#020617] sm:gap-3 sm:px-4 sm:py-2.5"
         >
           <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] dark:border-[#334155] dark:bg-[#0F172A]">
             <img
@@ -819,7 +872,7 @@ export function NovaAdvisorChat({
               <Sparkles className="h-3.5 w-3.5" />
               <span>Ask NOVA</span>
             </div>
-            <div className="text-xs font-semibold text-[#111827] dark:text-[#F3F4F6] whitespace-nowrap">
+            <div className="hidden text-xs font-semibold text-[#111827] dark:text-[#F3F4F6] sm:block whitespace-nowrap">
               Chat or Talk Live
             </div>
           </div>
@@ -827,10 +880,18 @@ export function NovaAdvisorChat({
       ) : (
         <section
           aria-label="NOVA Retail PC Advisor Chat"
-          className="flex h-[min(80vh,580px)] w-[min(94vw,410px)] flex-col overflow-hidden rounded-2xl border-2 border-[#111827] bg-white shadow-[6px_6px_0px_#0068B5] dark:border-[#38BDF8] dark:bg-[#111827] dark:shadow-[6px_6px_0px_#020617]"
+          className="flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-3xl border-t-2 border-x-2 border-[#111827] bg-white shadow-2xl dark:border-[#38BDF8] dark:bg-[#111827] sm:h-[min(80vh,580px)] sm:w-[min(94vw,410px)] sm:rounded-2xl sm:border-2 sm:shadow-[6px_6px_0px_#0068B5] dark:sm:shadow-[6px_6px_0px_#020617]"
         >
+          {/* Mobile Bottom-Sheet Drag Affordance */}
+          <div
+            aria-hidden="true"
+            className="flex shrink-0 justify-center bg-[#FAF8F5] pt-2.5 pb-1 dark:bg-[#0F172A] sm:hidden"
+          >
+            <span className="h-1.5 w-10 rounded-full bg-[#CBD5E1] dark:bg-[#334155]" />
+          </div>
+
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#E5E7EB] bg-[#FAF8F5] px-4 py-3 dark:border-[#1F2937] dark:bg-[#0F172A]">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#E5E7EB] bg-[#FAF8F5] px-4 py-2.5 dark:border-[#1F2937] dark:bg-[#0F172A] sm:py-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E5E7EB] bg-white dark:border-[#334155] dark:bg-[#1E293B]">
                 <img
@@ -849,11 +910,15 @@ export function NovaAdvisorChat({
                     NOVA
                   </span>
                   <span className="font-mono-tabular text-[11px] font-bold text-[#059669] dark:text-[#34D399]">
-                    {isVoiceActive ? '· Live Voice' : '· PC Advisor'}
+                    {isVoiceActive
+                      ? '· Live Voice'
+                      : isFastMode
+                        ? '· Shopping Friend'
+                        : '· PC Advisor'}
                   </span>
                 </div>
                 <p className="truncate text-[11px] text-[#6B7280] dark:text-[#94A3AF]">
-                  Reliance Digital · Croma · Vijay Sales
+                  Croma · Reliance Digital · Vijay Sales
                 </p>
               </div>
             </div>
@@ -871,7 +936,7 @@ export function NovaAdvisorChat({
                 disabled={isSending}
                 title={isVoiceActive ? 'End Live Voice' : 'Start Live Voice Conversation'}
                 aria-label={isVoiceActive ? 'End Live Voice' : 'Start Live Voice Conversation'}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors disabled:opacity-40 whitespace-nowrap shrink-0 ${
+                className={`inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-xs font-bold transition-colors disabled:opacity-40 sm:h-8 sm:px-2.5 sm:text-[11px] whitespace-nowrap shrink-0 ${
                   isVoiceActive
                     ? 'border-[#DC2626] bg-[#FEF2F2] text-[#B91C1C] hover:bg-[#FEE2E2] dark:border-[#F87171] dark:bg-[#450A0A]/60 dark:text-[#FCA5A5]'
                     : 'border-[#0068B5] bg-[#0068B5] text-white hover:bg-[#005291] dark:border-[#38BDF8] dark:bg-[#0284C7] dark:hover:bg-[#0369A1]'
@@ -887,7 +952,7 @@ export function NovaAdvisorChat({
                 disabled={isSending}
                 title="Start new conversation"
                 aria-label="Start new conversation"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#4B5563] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] disabled:opacity-40 dark:border-[#334155] dark:bg-[#1E293B] dark:text-[#94A3AF] dark:hover:border-[#38BDF8] dark:hover:text-[#F8FAFC]"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#4B5563] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] disabled:opacity-40 dark:border-[#334155] dark:bg-[#1E293B] dark:text-[#94A3AF] dark:hover:border-[#38BDF8] dark:hover:text-[#F8FAFC] sm:h-8 sm:w-8"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
               </button>
@@ -896,7 +961,7 @@ export function NovaAdvisorChat({
                 onClick={() => onOpenChange(false)}
                 title="Minimize NOVA"
                 aria-label="Minimize NOVA chat"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#4B5563] transition-colors hover:border-[#111827] hover:text-[#111827] dark:border-[#334155] dark:bg-[#1E293B] dark:text-[#94A3AF] dark:hover:border-[#38BDF8] dark:hover:text-[#F8FAFC]"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#4B5563] transition-colors hover:border-[#111827] hover:text-[#111827] dark:border-[#334155] dark:bg-[#1E293B] dark:text-[#94A3AF] dark:hover:border-[#38BDF8] dark:hover:text-[#F8FAFC] sm:h-8 sm:w-8"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -978,14 +1043,14 @@ export function NovaAdvisorChat({
               <div className="mb-1.5 font-mono-tabular text-[10px] font-bold tracking-wider text-[#6B7280] uppercase dark:text-[#94A3AF]">
                 Quick Kiosk Questions
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {QUICK_STARTERS.map((q) => (
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {activeQuickStarters.map((q) => (
                   <button
                     key={q}
                     type="button"
                     disabled={isSending}
                     onClick={() => void sendMessage(q)}
-                    className="truncate rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1F2937] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] disabled:opacity-50 dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#D1D5DB] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8]"
+                    className="min-h-[40px] truncate rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 text-left text-xs font-semibold text-[#1F2937] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] disabled:opacity-50 dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#D1D5DB] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8] sm:min-h-[32px] sm:px-2.5 sm:py-1.5 sm:text-[11px]"
                     title={q}
                   >
                     {q}
@@ -997,7 +1062,7 @@ export function NovaAdvisorChat({
 
           {/* Bottom Deck: Live Voice Acoustic Console OR Text Input Composer */}
           {isVoiceActive ? (
-            <div className="shrink-0 border-t-2 border-[#0068B5] bg-[#FAF8F5] px-4 py-3.5 dark:border-[#38BDF8] dark:bg-[#0F172A]">
+            <div className="shrink-0 border-t-2 border-[#0068B5] bg-[#FAF8F5] px-4 py-3.5 safe-pb dark:border-[#38BDF8] dark:bg-[#0F172A] sm:pb-3.5">
               <div className="flex items-center justify-between gap-3">
                 {/* Acoustic NPU Waveform + Live Status */}
                 <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -1048,7 +1113,7 @@ export function NovaAdvisorChat({
                     disabled={voiceState === 'connecting'}
                     title={micMuted ? 'Unmute Microphone' : 'Mute Microphone'}
                     aria-label={micMuted ? 'Unmute Microphone' : 'Mute Microphone'}
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors disabled:opacity-45 ${
+                    className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border transition-colors disabled:opacity-45 sm:h-9 sm:w-9 ${
                       micMuted
                         ? 'border-[#F59E0B] bg-[#FEF3C7] text-[#B45309] dark:border-[#FBBF24] dark:bg-[#451A03]/60 dark:text-[#FCD34D]'
                         : 'border-[#E5E7EB] bg-white text-[#111827] hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:hover:border-[#38BDF8]'
@@ -1062,7 +1127,7 @@ export function NovaAdvisorChat({
                     onClick={stopVoiceSession}
                     title="End Voice Conversation"
                     aria-label="End Voice Conversation"
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#DC2626] px-3 text-xs font-bold text-white transition-colors hover:bg-[#B91C1C]"
+                    className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-[#DC2626] px-3.5 text-xs font-bold text-white transition-colors hover:bg-[#B91C1C] sm:h-9 sm:px-3"
                   >
                     <PhoneOff className="h-3.5 w-3.5" />
                     <span>End</span>
@@ -1073,7 +1138,7 @@ export function NovaAdvisorChat({
           ) : (
             <form
               onSubmit={handleSubmit}
-              className="flex shrink-0 items-end gap-2 border-t border-[#E5E7EB] bg-white px-3.5 py-3 dark:border-[#1F2937] dark:bg-[#111827]"
+              className="flex shrink-0 items-end gap-2 border-t border-[#E5E7EB] bg-white px-3.5 py-3 safe-pb dark:border-[#1F2937] dark:bg-[#111827] sm:pb-3"
             >
               <button
                 type="button"
@@ -1081,7 +1146,7 @@ export function NovaAdvisorChat({
                 disabled={isSending}
                 title="Start real-time voice conversation with NOVA"
                 aria-label="Start real-time voice conversation with NOVA"
-                className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] text-[#0068B5] transition-colors hover:border-[#0068B5] hover:bg-[#EFF6FF] disabled:opacity-45 dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#38BDF8] dark:hover:border-[#38BDF8] dark:hover:bg-[#1E293B]"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] text-[#0068B5] transition-colors hover:border-[#0068B5] hover:bg-[#EFF6FF] disabled:opacity-45 dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#38BDF8] dark:hover:border-[#38BDF8] dark:hover:bg-[#1E293B] sm:h-[38px] sm:w-[38px]"
               >
                 <Mic className="h-4 w-4" />
               </button>
@@ -1092,17 +1157,21 @@ export function NovaAdvisorChat({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about Core Ultra 5/7/9, battery, or budget..."
+                placeholder={
+                  isFastMode
+                    ? 'Ask in plain English (e.g. battery, Tally, 4-year value)...'
+                    : 'Ask about Core Ultra 5/7/9, battery, or budget...'
+                }
                 disabled={isSending}
                 maxLength={800}
-                className="max-h-24 min-h-[38px] flex-1 resize-none rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 text-xs text-[#111827] placeholder-[#6B7280] focus:border-[#0068B5] focus:outline-none disabled:opacity-60 dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#F3F4F6] dark:placeholder-[#64748B] dark:focus:border-[#38BDF8]"
+                className="max-h-24 min-h-[44px] flex-1 resize-none rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2.5 text-sm text-[#111827] placeholder-[#6B7280] focus:border-[#0068B5] focus:outline-none disabled:opacity-60 dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#F3F4F6] dark:placeholder-[#64748B] dark:focus:border-[#38BDF8] sm:min-h-[38px] sm:py-2 sm:text-xs"
               />
 
               <button
                 type="submit"
                 disabled={isSending || !input.trim()}
                 aria-label="Send message to NOVA"
-                className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-[#0068B5] text-white transition-colors hover:bg-[#005291] disabled:cursor-not-allowed disabled:opacity-45"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#0068B5] text-white transition-colors hover:bg-[#005291] disabled:cursor-not-allowed disabled:opacity-45 sm:h-[38px] sm:w-[38px]"
               >
                 <Send className="h-4 w-4" />
               </button>

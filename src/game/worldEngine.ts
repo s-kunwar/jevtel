@@ -744,6 +744,13 @@ export class SiliconWorldEngine {
     this.canvas.addEventListener('click', this.handleCanvasClick);
   }
 
+  private computeFitScale(): number {
+    if (this.viewW < 640 && this.viewH >= this.viewW * 0.95) {
+      return Math.min(0.72, Math.max(0.46, Math.min(this.viewW / 690, this.viewH / 600)));
+    }
+    return Math.min(1, Math.max(0.68, Math.min(this.viewW / 1040, this.viewH / 580)));
+  }
+
   private handleCanvasClick = (e: MouseEvent): void => {
     if (this.phase !== 'PLAYING' && this.phase !== 'EXPO_PARK') return;
     const rect = this.canvas.getBoundingClientRect();
@@ -754,6 +761,7 @@ export class SiliconWorldEngine {
     const wx = ((sx - vw / 2) / this.camZoom + this.camX) / TILE_SIZE;
     const wy = ((sy - vh / 2) / this.camZoom + this.camY) / TILE_SIZE;
 
+    // 1. Direct tap-to-inspect Intel hardware props anywhere on screen
     for (const ip of this.intelProps) {
       const isStall = ip.kind === 'booth' || ip.kind.startsWith('stall');
       const hitW = isStall ? 1.55 : 0.95;
@@ -766,13 +774,62 @@ export class SiliconWorldEngine {
         return;
       }
     }
+
+    // 2. Direct tap on Festival Courtyard demo PCs (when in EXPO_PARK)
+    if (this.zone === 'EXPO_PARK') {
+      for (const pc of EXPO_PC_CATALOG) {
+        if (Math.hypot(wx - pc.wx, wy - (pc.wy - 0.35)) <= 1.25) {
+          const dist = Math.hypot(pc.wx - this.player.wx, pc.wy - this.player.wy);
+          if (dist <= 3.4) {
+            this.heldKeys.clear();
+            this.targetZoom = 1.16;
+            this.phase = 'DIALOGUE';
+            this.triggerPcDemoEffect(pc);
+            this.callbacks.onInteractExpoPc(pc);
+          } else {
+            this.spawnFloatingText(pc.wx, pc.wy - 0.85, 'Walk closer to try PC!', '#38BDF8');
+          }
+          return;
+        }
+      }
+    }
+
+    // 3. Direct tap on story NPCs
+    for (const npc of this.npcs) {
+      if (Math.hypot(wx - npc.wx, wy - (npc.wy - 0.3)) <= 1.2) {
+        const dist = Math.hypot(npc.wx - this.player.wx, npc.wy - this.player.wy);
+        if (dist <= 3.4) {
+          this.heldKeys.clear();
+          npc.interacted = true;
+          this.targetZoom = 1.15;
+          this.phase = 'DIALOGUE';
+          this.callbacks.onStartDialogue(npc.dialogueId);
+        } else {
+          this.spawnFloatingText(npc.wx, npc.wy - 0.85, 'Walk closer to talk!', '#FDE68A');
+        }
+        return;
+      }
+    }
+
+    // 4. Direct tap on unrescued task nodes
+    for (const task of this.tasks) {
+      if (!task.rescued && Math.hypot(wx - task.wx, wy - (task.wy - 0.2)) <= 1.2) {
+        const dist = Math.hypot(task.wx - this.player.wx, task.wy - this.player.wy);
+        if (dist <= 3.2) {
+          this.rescueTask(task);
+        } else {
+          this.spawnFloatingText(task.wx, task.wy - 0.85, 'Walk closer to rescue!', '#34D399');
+        }
+        return;
+      }
+    }
   };
 
   private handleResize = (): void => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const parent = this.canvas.parentElement;
-    const w = Math.max(320, parent?.clientWidth || window.innerWidth);
-    const h = Math.max(240, parent?.clientHeight || window.innerHeight);
+    const w = Math.max(280, parent?.clientWidth || window.innerWidth);
+    const h = Math.max(220, parent?.clientHeight || window.innerHeight);
     this.viewW = w;
     this.viewH = h;
     this.canvas.width = Math.floor(w * dpr);
@@ -1668,7 +1725,7 @@ export class SiliconWorldEngine {
     this.camY += (pPy + this.lookAheadY - this.camY) * Math.min(1, dt * 7);
 
     const dist = this.getCurrentDistrict();
-    const fitScale = Math.min(1, Math.max(0.68, Math.min(this.viewW / 1040, this.viewH / 580)));
+    const fitScale = this.computeFitScale();
     const baseZoom = dist === 'BOSS_COLOSSEUM' ? 0.85 : this.zone === 'EXPO_PARK' ? 1.06 : 0.96;
     this.targetZoom = baseZoom * fitScale;
 
@@ -1855,7 +1912,7 @@ export class SiliconWorldEngine {
     }
     this.camX += (this.player.wx * TILE_SIZE - this.camX) * Math.min(1, dt * 4);
     this.camY += (this.player.wy * TILE_SIZE - this.camY) * Math.min(1, dt * 4);
-    const fitScale = Math.min(1, Math.max(0.68, Math.min(this.viewW / 1040, this.viewH / 580)));
+    const fitScale = this.computeFitScale();
     this.targetZoom = 0.92 * fitScale;
     this.camZoom += (this.targetZoom - this.camZoom) * Math.min(1, dt * 4);
     this.updateParticles(dt);

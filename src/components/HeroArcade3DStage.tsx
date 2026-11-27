@@ -4,8 +4,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
 import { Play, Rotate3d, Shield, Volume2, VolumeX } from 'lucide-react';
-import { ARCADE_CABINET_ART_URLS, EDITORIAL_ART_URLS } from '../game/assets';
+import {
+  ARCADE_CABINET_ART_URLS,
+  EDITORIAL_ART_URLS,
+  getCachedImageSync,
+  getPreloadedOrLoadImage,
+} from '../game/assets';
 import { gameAudio } from '../game/audio';
+import { triggerHaptic } from '../game/haptics';
 
 interface HeroArcade3DStageProps {
   launchNonce: number;
@@ -15,6 +21,8 @@ interface HeroArcade3DStageProps {
   onToggleGlobalMute?: () => void;
   onLaunchComplete: () => void;
   onRequestLaunch: () => void;
+  onVideoReady?: () => void;
+  onCabinetArtReady?: () => void;
 }
 
 interface YTPlayerInstance {
@@ -93,6 +101,10 @@ function loadYouTubeIframeApi(): Promise<YTNamespace | null> {
   });
 
   return ytApiPromise;
+}
+
+export function preloadYouTubeIframeApi(): void {
+  void loadYouTubeIframeApi();
 }
 
 // Pre-allocated scratch vectors for zero-GC animation loop
@@ -177,122 +189,131 @@ function createSideDecalTexture(side: 'left' | 'right'): THREE.CanvasTexture {
   canvas.height = 1024;
   const ctx = canvas.getContext('2d')!;
 
-  // Brushed slate-cobalt recessed side plate
-  const bg = ctx.createLinearGradient(0, 0, 512, 1024);
-  bg.addColorStop(0, '#0F1A2E');
-  bg.addColorStop(0.45, '#0B1324');
-  bg.addColorStop(1, '#09101E');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, 512, 1024);
-
-  // Anodized cobalt perimeter pinstripe
-  ctx.strokeStyle = '#0068B5';
-  ctx.lineWidth = 8;
-  ctx.strokeRect(18, 18, 476, 988);
-
-  ctx.strokeStyle = 'rgba(0, 199, 253, 0.35)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(32, 32, 448, 960);
-
-  // Diagonal Intel Silicon Forge diagonal cobalt chevron stripe
-  ctx.save();
-  ctx.fillStyle = '#0068B5';
-  ctx.beginPath();
-  if (side === 'left') {
-    ctx.moveTo(32, 170);
-    ctx.lineTo(480, 320);
-    ctx.lineTo(480, 440);
-    ctx.lineTo(32, 290);
-  } else {
-    ctx.moveTo(32, 320);
-    ctx.lineTo(480, 170);
-    ctx.lineTo(480, 290);
-    ctx.lineTo(32, 440);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // Electric cyan thin highlight line
-  ctx.fillStyle = '#00C7FD';
-  ctx.beginPath();
-  if (side === 'left') {
-    ctx.moveTo(32, 295);
-    ctx.lineTo(480, 445);
-    ctx.lineTo(480, 456);
-    ctx.lineTo(32, 306);
-  } else {
-    ctx.moveTo(32, 445);
-    ctx.lineTo(480, 295);
-    ctx.lineTo(480, 306);
-    ctx.lineTo(32, 456);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  // Custom Core Ultra 3D tile emblem (CPU / GPU / NPU chiplet diagram)
-  const cx = 256;
-  const cy = 615;
-  ctx.strokeStyle = 'rgba(0, 199, 253, 0.42)';
-  ctx.lineWidth = 3;
-  for (let i = -3; i <= 3; i++) {
-    ctx.beginPath();
-    ctx.moveTo(cx + i * 26, cy - 118);
-    ctx.lineTo(cx + i * 26, cy + 118);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx - 118, cy + i * 26);
-    ctx.lineTo(cx + 118, cy + i * 26);
-    ctx.stroke();
-  }
-
-  // Die package border
-  ctx.fillStyle = '#111D33';
-  ctx.fillRect(cx - 88, cy - 88, 176, 176);
-  ctx.strokeStyle = '#94A3B8';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(cx - 88, cy - 88, 176, 176);
-
-  // Tile subdivisions inside die
-  ctx.fillStyle = '#0068B5';
-  ctx.fillRect(cx - 72, cy - 72, 68, 68); // Compute Tile
-  ctx.fillStyle = '#00A3E0';
-  ctx.fillRect(cx + 4, cy - 72, 68, 68); // Arc Graphics Tile
-  ctx.fillStyle = '#0284C7';
-  ctx.fillRect(cx - 72, cy + 4, 144, 68); // AI Boost NPU Tile
-
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = '700 18px "JetBrains Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('CPU', cx - 38, cy - 32);
-  ctx.fillText('ARC', cx + 38, cy - 32);
-  ctx.fillText('INTEL AI BOOST NPU', cx, cy + 44);
-
-  // Architectural typography header & footer
-  ctx.fillStyle = '#00C7FD';
-  ctx.font = '700 24px "JetBrains Mono", monospace';
-  ctx.fillText('INTEL · SILICON FORGE', 256, 98);
-
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = '800 54px "Bricolage Grotesque", system-ui, sans-serif';
-  ctx.fillText('CORE ULTRA', 256, 152);
-
-  ctx.fillStyle = '#CBD5E1';
-  ctx.font = '700 22px "Chakra Petch", sans-serif';
-  ctx.fillText('JEVTEL CUSTOM EDITION', 256, 868);
-
-  // Lower heat-sink louver lines
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = i % 2 === 0 ? '#1E293B' : '#0068B5';
-    ctx.fillRect(96, 902 + i * 16, 320, 7);
-  }
-
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+
+  const paintDecal = () => {
+    // Brushed slate-cobalt recessed side plate
+    const bg = ctx.createLinearGradient(0, 0, 512, 1024);
+    bg.addColorStop(0, '#0F1A2E');
+    bg.addColorStop(0.45, '#0B1324');
+    bg.addColorStop(1, '#09101E');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 512, 1024);
+
+    // Anodized cobalt perimeter pinstripe
+    ctx.strokeStyle = '#0068B5';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(18, 18, 476, 988);
+
+    ctx.strokeStyle = 'rgba(0, 199, 253, 0.35)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(32, 32, 448, 960);
+
+    // Diagonal Intel Silicon Forge diagonal cobalt chevron stripe
+    ctx.save();
+    ctx.fillStyle = '#0068B5';
+    ctx.beginPath();
+    if (side === 'left') {
+      ctx.moveTo(32, 170);
+      ctx.lineTo(480, 320);
+      ctx.lineTo(480, 440);
+      ctx.lineTo(32, 290);
+    } else {
+      ctx.moveTo(32, 320);
+      ctx.lineTo(480, 170);
+      ctx.lineTo(480, 290);
+      ctx.lineTo(32, 440);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Electric cyan thin highlight line
+    ctx.fillStyle = '#00C7FD';
+    ctx.beginPath();
+    if (side === 'left') {
+      ctx.moveTo(32, 295);
+      ctx.lineTo(480, 445);
+      ctx.lineTo(480, 456);
+      ctx.lineTo(32, 306);
+    } else {
+      ctx.moveTo(32, 445);
+      ctx.lineTo(480, 295);
+      ctx.lineTo(480, 306);
+      ctx.lineTo(32, 456);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Custom Core Ultra 3D tile emblem (CPU / GPU / NPU chiplet diagram)
+    const cx = 256;
+    const cy = 615;
+    ctx.strokeStyle = 'rgba(0, 199, 253, 0.42)';
+    ctx.lineWidth = 3;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 26, cy - 118);
+      ctx.lineTo(cx + i * 26, cy + 118);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 118, cy + i * 26);
+      ctx.lineTo(cx + 118, cy + i * 26);
+      ctx.stroke();
+    }
+
+    // Die package border
+    ctx.fillStyle = '#111D33';
+    ctx.fillRect(cx - 88, cy - 88, 176, 176);
+    ctx.strokeStyle = '#94A3B8';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(cx - 88, cy - 88, 176, 176);
+
+    // Tile subdivisions inside die
+    ctx.fillStyle = '#0068B5';
+    ctx.fillRect(cx - 72, cy - 72, 68, 68); // Compute Tile
+    ctx.fillStyle = '#00A3E0';
+    ctx.fillRect(cx + 4, cy - 72, 68, 68); // Arc Graphics Tile
+    ctx.fillStyle = '#0284C7';
+    ctx.fillRect(cx - 72, cy + 4, 144, 68); // AI Boost NPU Tile
+
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = '700 18px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('CPU', cx - 38, cy - 32);
+    ctx.fillText('ARC', cx + 38, cy - 32);
+    ctx.fillText('INTEL AI BOOST NPU', cx, cy + 44);
+
+    // Architectural typography header & footer
+    ctx.fillStyle = '#00C7FD';
+    ctx.font = '700 24px "JetBrains Mono", monospace';
+    ctx.fillText('INTEL · SILICON FORGE', 256, 98);
+
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = '800 54px "Bricolage Grotesque", system-ui, sans-serif';
+    ctx.fillText('CORE ULTRA', 256, 152);
+
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = '700 22px "Chakra Petch", sans-serif';
+    ctx.fillText('JEVTEL CUSTOM EDITION', 256, 868);
+
+    // Lower heat-sink louver lines
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = i % 2 === 0 ? '#1E293B' : '#0068B5';
+      ctx.fillRect(96, 902 + i * 16, 320, 7);
+    }
+
+    tex.needsUpdate = true;
+  };
+
+  paintDecal();
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    void document.fonts.ready.then(paintDecal).catch(() => undefined);
+  }
   return tex;
 }
 
-function createCoreUltraMarqueeTexture(): THREE.CanvasTexture {
+function createCoreUltraMarqueeTexture(onArtPainted?: () => void): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
   canvas.height = 256;
@@ -300,6 +321,11 @@ function createCoreUltraMarqueeTexture(): THREE.CanvasTexture {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+
+  let loadedBannerImg: HTMLImageElement | undefined = getCachedImageSync(
+    ARCADE_CABINET_ART_URLS.marqueeTinySwords
+  );
+  let readyFired = false;
 
   const paintMarquee = (bannerImg?: HTMLImageElement) => {
     const grad = ctx.createLinearGradient(0, 0, 1024, 256);
@@ -356,10 +382,33 @@ function createCoreUltraMarqueeTexture(): THREE.CanvasTexture {
     tex.needsUpdate = true;
   };
 
-  paintMarquee();
-  const img = new Image();
-  img.onload = () => paintMarquee(img);
-  img.src = ARCADE_CABINET_ART_URLS.marqueeTinySwords;
+  paintMarquee(loadedBannerImg);
+
+  const notifyOnce = () => {
+    if (readyFired) return;
+    readyFired = true;
+    onArtPainted?.();
+  };
+
+  const imgPromise = loadedBannerImg
+    ? Promise.resolve(loadedBannerImg)
+    : getPreloadedOrLoadImage(ARCADE_CABINET_ART_URLS.marqueeTinySwords).then((img) => {
+        loadedBannerImg = img;
+        return img;
+      });
+
+  const fontsReady =
+    typeof document !== 'undefined' && document.fonts?.ready
+      ? Promise.race([
+          document.fonts.ready.catch(() => undefined),
+          new Promise((r) => window.setTimeout(r, 2500)),
+        ])
+      : Promise.resolve();
+
+  void Promise.all([imgPromise, fontsReady]).then(([img]) => {
+    paintMarquee(img);
+    notifyOnce();
+  });
 
   return tex;
 }
@@ -370,49 +419,58 @@ function createControlDeckTexture(): THREE.CanvasTexture {
   canvas.height = 512;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#121B2E';
-  ctx.fillRect(0, 0, 1024, 512);
-
-  // Brushed aluminum perimeter trim line
-  ctx.strokeStyle = '#0068B5';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(20, 20, 984, 472);
-
-  ctx.strokeStyle = 'rgba(0, 199, 253, 0.35)';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(38, 38, 948, 436);
-
-  // Subtle circuit vector line linking stick to action buttons
-  ctx.strokeStyle = 'rgba(0, 199, 253, 0.25)';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(270, 290);
-  ctx.lineTo(490, 290);
-  ctx.lineTo(540, 255);
-  ctx.lineTo(860, 255);
-  ctx.stroke();
-
-  // Silkscreen control legends aligned below joystick & 3 cobalt buttons
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '700 22px "JetBrains Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('MOVE', 260, 412);
-
-  ctx.fillStyle = '#7DD3FC';
-  ctx.fillText('ATK', 615, 388);
-  ctx.fillText('NPU', 730, 336);
-  ctx.fillText('DASH', 840, 396);
-
-  ctx.fillStyle = '#E2E8F0';
-  ctx.font = '700 20px "Chakra Petch", sans-serif';
-  ctx.fillText('TINY SWORDS · SILICON FORGE DECK', 512, 86);
-
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+
+  const paintDeck = () => {
+    ctx.fillStyle = '#121B2E';
+    ctx.fillRect(0, 0, 1024, 512);
+
+    // Brushed aluminum perimeter trim line
+    ctx.strokeStyle = '#0068B5';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(20, 20, 984, 472);
+
+    ctx.strokeStyle = 'rgba(0, 199, 253, 0.35)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(38, 38, 948, 436);
+
+    // Subtle circuit vector line linking stick to action buttons
+    ctx.strokeStyle = 'rgba(0, 199, 253, 0.25)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(270, 290);
+    ctx.lineTo(490, 290);
+    ctx.lineTo(540, 255);
+    ctx.lineTo(860, 255);
+    ctx.stroke();
+
+    // Silkscreen control legends aligned below joystick & 3 cobalt buttons
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '700 22px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('MOVE', 260, 412);
+
+    ctx.fillStyle = '#7DD3FC';
+    ctx.fillText('ATK', 615, 388);
+    ctx.fillText('NPU', 730, 336);
+    ctx.fillText('DASH', 840, 396);
+
+    ctx.fillStyle = '#E2E8F0';
+    ctx.font = '700 20px "Chakra Petch", sans-serif';
+    ctx.fillText('TINY SWORDS · SILICON FORGE DECK', 512, 86);
+
+    tex.needsUpdate = true;
+  };
+
+  paintDeck();
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    void document.fonts.ready.then(paintDeck).catch(() => undefined);
+  }
   return tex;
 }
 
-function createCoinDoorTexture(): THREE.CanvasTexture {
+function createCoinDoorTexture(onArtPainted?: () => void): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 768;
   canvas.height = 576;
@@ -420,6 +478,11 @@ function createCoinDoorTexture(): THREE.CanvasTexture {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+
+  let loadedArtImg: HTMLImageElement | undefined = getCachedImageSync(
+    ARCADE_CABINET_ART_URLS.frontTinySwords
+  );
+  let readyFired = false;
 
   const paintFrontPanel = (artImg?: HTMLImageElement) => {
     const bg = ctx.createLinearGradient(0, 0, 768, 576);
@@ -516,10 +579,33 @@ function createCoinDoorTexture(): THREE.CanvasTexture {
     tex.needsUpdate = true;
   };
 
-  paintFrontPanel();
-  const img = new Image();
-  img.onload = () => paintFrontPanel(img);
-  img.src = ARCADE_CABINET_ART_URLS.frontTinySwords;
+  paintFrontPanel(loadedArtImg);
+
+  const notifyOnce = () => {
+    if (readyFired) return;
+    readyFired = true;
+    onArtPainted?.();
+  };
+
+  const imgPromise = loadedArtImg
+    ? Promise.resolve(loadedArtImg)
+    : getPreloadedOrLoadImage(ARCADE_CABINET_ART_URLS.frontTinySwords).then((img) => {
+        loadedArtImg = img;
+        return img;
+      });
+
+  const fontsReady =
+    typeof document !== 'undefined' && document.fonts?.ready
+      ? Promise.race([
+          document.fonts.ready.catch(() => undefined),
+          new Promise((r) => window.setTimeout(r, 2500)),
+        ])
+      : Promise.resolve();
+
+  void Promise.all([imgPromise, fontsReady]).then(([img]) => {
+    paintFrontPanel(img);
+    notifyOnce();
+  });
 
   return tex;
 }
@@ -595,12 +681,15 @@ export function HeroArcade3DStage({
   onToggleGlobalMute,
   onLaunchComplete,
   onRequestLaunch,
+  onVideoReady,
+  onCabinetArtReady,
 }: HeroArcade3DStageProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [webglFailed, setWebglFailed] = useState(false);
   const [hoveredPart, setHoveredPart] = useState(false);
   const [videoMuted, setVideoMuted] = useState(true);
   const [videoReady, setVideoReady] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [prefersReducedMotion] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -615,6 +704,33 @@ export function HeroArcade3DStage({
   onLaunchCompleteRef.current = onLaunchComplete;
   const onRequestLaunchRef = useRef(onRequestLaunch);
   onRequestLaunchRef.current = onRequestLaunch;
+  const onVideoReadyRef = useRef(onVideoReady);
+  onVideoReadyRef.current = onVideoReady;
+  const onCabinetArtReadyRef = useRef(onCabinetArtReady);
+  onCabinetArtReadyRef.current = onCabinetArtReady;
+  const signaledReadyRef = useRef(false);
+  const signaledCabinetArtRef = useRef(false);
+
+  const notifyVideoReady = () => {
+    if (signaledReadyRef.current) return;
+    signaledReadyRef.current = true;
+    onVideoReadyRef.current?.();
+  };
+
+  const notifyCabinetArtReady = () => {
+    if (signaledCabinetArtRef.current) return;
+    signaledCabinetArtRef.current = true;
+    onCabinetArtReadyRef.current?.();
+  };
+
+  useEffect(() => {
+    if (prefersReducedMotion || webglFailed) {
+      signaledReadyRef.current = true;
+      onVideoReadyRef.current?.();
+      signaledCabinetArtRef.current = true;
+      onCabinetArtReadyRef.current?.();
+    }
+  }, [prefersReducedMotion, webglFailed]);
 
   const triggerLaunchRef = useRef<(() => void) | null>(null);
   const lastHandledNonceRef = useRef(launchNonce);
@@ -625,6 +741,19 @@ export function HeroArcade3DStage({
   const userDesiredMutedRef = useRef(true);
   const hasUnlockedAudioRef = useRef(false);
   const isLaunchingRef = useRef(false);
+  const touchOrbitRef = useRef<{
+    active: boolean;
+    theta: number;
+    phi: number;
+    lastX: number;
+    lastY: number;
+  }>({
+    active: false,
+    theta: HOME_SPHERICAL.theta,
+    phi: HOME_SPHERICAL.phi,
+    lastX: 0,
+    lastY: 0,
+  });
 
   const clearPlaylistTimers = () => {
     if (playlistGapTimerRef.current !== null) {
@@ -806,6 +935,11 @@ export function HeroArcade3DStage({
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     renderer.domElement.style.background = 'transparent';
+    const isTouchOrMobileInit =
+      (window.matchMedia?.('(pointer: coarse)')?.matches ?? false) ||
+      (navigator.maxTouchPoints > 0 && window.innerWidth < 1024);
+    setIsTouchDevice(isTouchOrMobileInit);
+    renderer.domElement.style.touchAction = isTouchOrMobileInit ? 'pan-y' : 'none';
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
@@ -821,16 +955,18 @@ export function HeroArcade3DStage({
     roomEnv.dispose();
     pmremGenerator.dispose();
 
-    const width = Math.max(container.clientWidth, 320);
-    const height = Math.max(container.clientHeight, 360);
-    const camera = new THREE.PerspectiveCamera(HOME_FOV, width / height, 0.1, 40);
+    const width = Math.max(container.clientWidth, 280);
+    const height = Math.max(container.clientHeight, 330);
+    let currentAspect = width / height;
+    const camera = new THREE.PerspectiveCamera(HOME_FOV, currentAspect, 0.1, 40);
     camera.position.copy(HOME_CAM_POS);
     renderer.setSize(width, height, false);
     cssRenderer.setSize(width, height);
 
-    // OrbitControls — rotatable hero showcase with clean framing
+    // OrbitControls — rotatable hero showcase on desktop; scroll-safe on smartphones (via Spin handle)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(HOME_LOOK_AT);
+    controls.enabled = !isTouchOrMobileInit;
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
     controls.enableZoom = false;
@@ -889,13 +1025,33 @@ export function HeroArcade3DStage({
       return t;
     };
 
-    // Custom Intel Silicon Forge procedural textures
+    // Custom Intel Silicon Forge procedural textures + decoded cabinet artwork
+    let marqueePainted = false;
+    let coinDoorPainted = false;
+    let firstFrameRendered = false;
+
+    const trySignalCabinetReady = () => {
+      if (!disposed && marqueePainted && coinDoorPainted && firstFrameRendered) {
+        notifyCabinetArtReady();
+      }
+    };
+
     const aluminumTex = trackTex(createBrushedAluminumTexture());
     const leftDecalTex = trackTex(createSideDecalTexture('left'));
     const rightDecalTex = trackTex(createSideDecalTexture('right'));
-    const marqueeTex = trackTex(createCoreUltraMarqueeTexture());
+    const marqueeTex = trackTex(
+      createCoreUltraMarqueeTexture(() => {
+        marqueePainted = true;
+        trySignalCabinetReady();
+      })
+    );
     const deckTex = trackTex(createControlDeckTexture());
-    const coinDoorTex = trackTex(createCoinDoorTexture());
+    const coinDoorTex = trackTex(
+      createCoinDoorTexture(() => {
+        coinDoorPainted = true;
+        trySignalCabinetReady();
+      })
+    );
     const shadowTex = trackTex(createContactShadowTexture());
 
     // CRT launch-flash CanvasTexture behind / replacing CSS3D video during launch dive
@@ -1445,7 +1601,10 @@ export function HeroArcade3DStage({
     };
 
     void loadYouTubeIframeApi().then((YT) => {
-      if (disposed || !YT?.Player) return;
+      if (disposed || !YT?.Player) {
+        notifyVideoReady();
+        return;
+      }
       try {
         const firstVideo = YOUTUBE_PLAYLIST[0];
         const player = new YT.Player(ytMountEl, {
@@ -1479,9 +1638,9 @@ export function HeroArcade3DStage({
               setVideoReady(true);
               crtStandbyOverlay.style.display = 'none';
               try {
-                ev.target.seekTo(firstVideo.startSeconds, true);
+                // Start muted without re-seeking (start:42 is already in playerVars) so autoplay starts immediately
                 if (!isLaunchingRef.current && !pausedRef.current) {
-                  syncMuteState(ev.target);
+                  ev.target.mute();
                   ev.target.playVideo();
                 } else {
                   ev.target.mute();
@@ -1490,6 +1649,9 @@ export function HeroArcade3DStage({
               } catch {
                 // Ignore
               }
+              window.setTimeout(() => {
+                if (!disposed) notifyVideoReady();
+              }, 900);
             },
             onStateChange: (ev) => {
               if (disposed) return;
@@ -1497,8 +1659,12 @@ export function HeroArcade3DStage({
               const playingCode = YT.PlayerState?.PLAYING ?? 1;
               if (ev.data === playingCode) {
                 crtStandbyOverlay.style.display = 'none';
+                notifyVideoReady();
                 try {
-                  syncMuteState(ev.target);
+                  if (!userDesiredMutedRef.current && hasUnlockedAudioRef.current) {
+                    ev.target.unMute();
+                    ev.target.setVolume(85);
+                  }
                 } catch {
                   // Ignore
                 }
@@ -1533,7 +1699,7 @@ export function HeroArcade3DStage({
         });
         ytPlayerRef.current = player;
       } catch {
-        // Fallback to CRT texture if YouTube constructor fails
+        notifyVideoReady();
       }
     });
 
@@ -1584,10 +1750,8 @@ export function HeroArcade3DStage({
     };
     triggerLaunchRef.current = startCabinetLaunch;
 
-    // Pointer drag-vs-click guard + smooth hover-orbit tracking
-    const isTouchOrMobile =
-      (window.matchMedia?.('(pointer: coarse)')?.matches ?? false) ||
-      navigator.maxTouchPoints > 0;
+    // Pointer drag-vs-click guard + smooth hover-orbit + direct touch drag-to-spin
+    const isTouchOrMobile = isTouchOrMobileInit;
     let downX = 0;
     let downY = 0;
     let lastHoverCheck = 0;
@@ -1595,6 +1759,14 @@ export function HeroArcade3DStage({
     let hoverTargetX = 0;
     let hoverTargetY = 0;
     let isManualDragging = false;
+
+    let touchGestureActive = false;
+    let touchPointerId = -1;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchLastX = 0;
+    let touchSpinning = false;
+    let touchCancelled = false;
 
     const onControlsStart = () => {
       isManualDragging = true;
@@ -1615,10 +1787,40 @@ export function HeroArcade3DStage({
     const onPointerDown = (ev: PointerEvent) => {
       downX = ev.clientX;
       downY = ev.clientY;
+      if (ev.pointerType === 'touch') {
+        touchGestureActive = true;
+        touchPointerId = ev.pointerId;
+        touchStartX = ev.clientX;
+        touchStartY = ev.clientY;
+        touchLastX = ev.clientX;
+        touchSpinning = false;
+        touchCancelled = false;
+      }
     };
 
     const onPointerMove = (ev: PointerEvent) => {
       if (launchState === 'launching') return;
+
+      if (ev.pointerType === 'touch' && touchGestureActive && ev.pointerId === touchPointerId) {
+        const dxTotal = ev.clientX - touchStartX;
+        const dyTotal = ev.clientY - touchStartY;
+        if (!touchSpinning) {
+          if (Math.abs(dxTotal) > 6 && Math.abs(dxTotal) >= Math.abs(dyTotal) * 0.75) {
+            touchSpinning = true;
+            touchOrbitRef.current.active = true;
+            touchLastX = ev.clientX;
+          }
+        } else {
+          const stepDx = ev.clientX - touchLastX;
+          touchLastX = ev.clientX;
+          touchOrbitRef.current.theta = THREE.MathUtils.clamp(
+            touchOrbitRef.current.theta - stepDx * 0.0115,
+            -0.82,
+            0.82
+          );
+        }
+        return;
+      }
 
       updatePointerNdc(ev);
       if (ev.pointerType !== 'touch') {
@@ -1650,11 +1852,28 @@ export function HeroArcade3DStage({
       }
     };
 
+    const onPointerCancel = (ev: PointerEvent) => {
+      if (ev.pointerType === 'touch' && ev.pointerId === touchPointerId) {
+        touchGestureActive = false;
+        touchSpinning = false;
+        touchCancelled = true;
+        touchOrbitRef.current.active = false;
+      }
+    };
+
     const onPointerUp = (ev: PointerEvent) => {
       if (launchState === 'launching') return;
+      const wasTouchSpin = ev.pointerType === 'touch' && (touchSpinning || touchCancelled);
+      if (ev.pointerType === 'touch' && ev.pointerId === touchPointerId) {
+        touchGestureActive = false;
+        touchSpinning = false;
+        touchOrbitRef.current.active = false;
+      }
+
       const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY);
-      if (dist > 7) {
-        // User spun the 3D cabinet -> unlock CRT sound cleanly on first interaction
+      const tapTolerance = ev.pointerType === 'touch' ? 14 : 7;
+      if (wasTouchSpin || dist > tapTolerance) {
+        // User spun the 3D cabinet or scrolled -> unlock CRT sound cleanly
         if (!hasUnlockedAudioRef.current) {
           hasUnlockedAudioRef.current = true;
           userDesiredMutedRef.current = false;
@@ -1674,6 +1893,7 @@ export function HeroArcade3DStage({
       raycaster.setFromCamera(_pointerNdc, camera);
       const hits = raycaster.intersectObjects(interactiveMeshes, false);
       if (hits.length > 0) {
+        triggerHaptic(14, globalMutedRef.current);
         cutVideoForLaunch();
         onRequestLaunchRef.current();
       } else if (!hasUnlockedAudioRef.current) {
@@ -1693,6 +1913,7 @@ export function HeroArcade3DStage({
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', onPointerLeave);
+    renderer.domElement.addEventListener('pointercancel', onPointerCancel);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
 
     // Visibility & Viewport observers
@@ -1719,7 +1940,8 @@ export function HeroArcade3DStage({
       if (!entry) return;
       const w = Math.max(Math.floor(entry.contentRect.width), 100);
       const h = Math.max(Math.floor(entry.contentRect.height), 100);
-      camera.aspect = w / h;
+      currentAspect = w / h;
+      camera.aspect = currentAspect;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
       cssRenderer.setSize(w, h);
@@ -1750,7 +1972,7 @@ export function HeroArcade3DStage({
       camera.fov = HOME_FOV;
       camera.updateProjectionMatrix();
       controls.target.copy(HOME_LOOK_AT);
-      controls.enabled = true;
+      controls.enabled = !isTouchOrMobile;
       controls.update();
       drawCrtIdleOrLaunchFrame(crtCtx, 512, 384, 0);
       crtTex.needsUpdate = true;
@@ -1798,7 +2020,36 @@ export function HeroArcade3DStage({
           joyTiltX += (targetHoverTilt - joyTiltX) * Math.min(1, dt * 8);
           joyTiltZ += ((isHovered ? -0.08 : 0) - joyTiltZ) * Math.min(1, dt * 8);
 
-          if (!isManualDragging && !isTouchOrMobile) {
+          const aspectRadiusBoost =
+            currentAspect < 1.08 ? Math.min(1.26, 1.08 / Math.max(0.68, currentAspect)) : 1;
+          const desiredRadius = HOME_SPHERICAL.radius * aspectRadiusBoost;
+
+          if (isTouchOrMobile) {
+            // Driven smoothly either by the dedicated Drag-to-Spin handle or gentle return to hero angle
+            const targetTheta = touchOrbitRef.current.active
+              ? touchOrbitRef.current.theta
+              : touchOrbitRef.current.theta;
+            const targetPhi = touchOrbitRef.current.phi;
+
+            _hoverOffset.copy(camera.position).sub(controls.target);
+            _hoverSpherical.setFromVector3(_hoverOffset);
+            _hoverSpherical.theta = THREE.MathUtils.damp(
+              _hoverSpherical.theta,
+              targetTheta,
+              7.5,
+              dt
+            );
+            _hoverSpherical.phi = THREE.MathUtils.damp(_hoverSpherical.phi, targetPhi, 7.5, dt);
+            _hoverSpherical.radius = THREE.MathUtils.damp(
+              _hoverSpherical.radius,
+              desiredRadius,
+              6.5,
+              dt
+            );
+            _hoverOffset.setFromSpherical(_hoverSpherical);
+            camera.position.copy(controls.target).add(_hoverOffset);
+            camera.lookAt(controls.target);
+          } else if (!isManualDragging) {
             const targetTheta = isPointerInside
               ? THREE.MathUtils.clamp(0.18 + hoverTargetX * 0.62, -0.78, 0.80)
               : HOME_SPHERICAL.theta;
@@ -1817,7 +2068,7 @@ export function HeroArcade3DStage({
             _hoverSpherical.phi = THREE.MathUtils.damp(_hoverSpherical.phi, targetPhi, 5.2, dt);
             _hoverSpherical.radius = THREE.MathUtils.damp(
               _hoverSpherical.radius,
-              HOME_SPHERICAL.radius,
+              desiredRadius,
               5.2,
               dt
             );
@@ -1895,6 +2146,10 @@ export function HeroArcade3DStage({
 
         renderer.render(scene, camera);
         cssRenderer.render(cssScene, camera);
+        if (!firstFrameRendered) {
+          firstFrameRendered = true;
+          trySignalCabinetReady();
+        }
       }
 
       if (isSoftwareGl) {
@@ -1919,6 +2174,7 @@ export function HeroArcade3DStage({
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
+      renderer.domElement.removeEventListener('pointercancel', onPointerCancel);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
@@ -1986,27 +2242,36 @@ export function HeroArcade3DStage({
   return (
     <div
       data-theme-mode={darkMode ? 'dark' : 'light'}
-      className="relative h-full min-h-[430px] w-full overflow-hidden bg-transparent"
+      className="relative h-[350px] w-full overflow-hidden bg-transparent sm:h-[430px] lg:h-full lg:min-h-[430px]"
     >
       {/* Dedicated WebGL + Synced CSS3D Mount Container */}
       <div
         ref={mountRef}
-        className={`relative h-full min-h-[430px] w-full bg-transparent ${hoveredPart ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
-        aria-label="Interactive 3D Intel Core Ultra Arcade Machine. Hover to orbit or click the screen or buttons to launch gameplay."
+        className={`relative h-full w-full bg-transparent ${
+          isTouchDevice
+            ? 'touch-pan-y'
+            : hoveredPart
+              ? 'cursor-pointer'
+              : 'cursor-grab active:cursor-grabbing'
+        }`}
+        aria-label="Interactive 3D Intel Core Ultra Arcade Machine. Tap screen or Play Arcade to launch gameplay."
       />
 
-      {/* Discreet Corner Video Audio Toggle */}
+      {/* Discreet Corner Video Audio Toggle (Touch-Friendly >=44px) */}
       {videoReady && (
         <button
           type="button"
           data-crt-audio-toggle="true"
-          onClick={handleToggleVideoAudio}
-          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white/75 px-3 py-1.5 text-[11px] font-bold text-slate-900 shadow-xs backdrop-blur-md transition-colors hover:border-[#0068B5]/40 hover:text-[#0068B5] dark:border-white/15 dark:bg-slate-950/60 dark:text-white dark:hover:border-[#38BDF8]/50 dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
+          onClick={() => {
+            triggerHaptic(8, globalMuted);
+            handleToggleVideoAudio();
+          }}
+          className="absolute right-2.5 top-2.5 z-10 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-slate-900/15 bg-white/85 px-3.5 py-2 text-[11px] font-bold text-slate-900 shadow-xs backdrop-blur-md transition-colors hover:border-[#0068B5]/40 hover:text-[#0068B5] dark:border-white/15 dark:bg-slate-950/70 dark:text-white dark:hover:border-[#38BDF8]/50 dark:hover:text-[#38BDF8] sm:right-3 sm:top-3 whitespace-nowrap shrink-0"
         >
           {globalMuted || videoMuted ? (
             <>
               <VolumeX className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
-              <span>{globalMuted ? 'Muted' : 'Tap anywhere for sound'}</span>
+              <span>{globalMuted ? 'Muted' : 'Tap for Sound'}</span>
             </>
           ) : (
             <>
@@ -2017,20 +2282,72 @@ export function HeroArcade3DStage({
         </button>
       )}
 
-      {/* Theme-Aware Floating HUD Pills */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white/75 px-3 py-1.5 text-[11px] font-bold text-slate-900 shadow-xs backdrop-blur-md transition-colors dark:border-white/15 dark:bg-slate-950/60 dark:text-white whitespace-nowrap shrink-0">
-        <Rotate3d className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
-        <span>Hover to orbit</span>
-      </div>
+      {/* Bottom-Left: Scroll-Safe Drag Handle on Touch Devices, Hover Label on Desktop */}
+      {isTouchDevice ? (
+        <div
+          role="slider"
+          aria-label="Drag handle to spin 3D arcade cabinet"
+          aria-valuemin={-80}
+          aria-valuemax={80}
+          aria-valuenow={Math.round((touchOrbitRef.current.theta / 0.8) * 80)}
+          tabIndex={0}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            touchOrbitRef.current.active = true;
+            touchOrbitRef.current.lastX = e.clientX;
+            touchOrbitRef.current.lastY = e.clientY;
+            triggerHaptic(6, globalMuted);
+          }}
+          onPointerMove={(e) => {
+            if (!touchOrbitRef.current.active) return;
+            const dx = e.clientX - touchOrbitRef.current.lastX;
+            const dy = e.clientY - touchOrbitRef.current.lastY;
+            touchOrbitRef.current.lastX = e.clientX;
+            touchOrbitRef.current.lastY = e.clientY;
+            touchOrbitRef.current.theta = THREE.MathUtils.clamp(
+              touchOrbitRef.current.theta - dx * 0.009,
+              -0.82,
+              0.82
+            );
+            touchOrbitRef.current.phi = THREE.MathUtils.clamp(
+              touchOrbitRef.current.phi - dy * 0.005,
+              0.92,
+              1.52
+            );
+          }}
+          onPointerUp={(e) => {
+            touchOrbitRef.current.active = false;
+            try {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            } catch {
+              // ignore
+            }
+          }}
+          onPointerCancel={() => {
+            touchOrbitRef.current.active = false;
+          }}
+          className="absolute bottom-2.5 left-2.5 z-10 flex min-h-[44px] touch-none select-none items-center gap-1.5 rounded-full border border-slate-900/15 bg-white/85 px-3.5 py-2 text-[11px] font-bold text-slate-900 shadow-xs backdrop-blur-md active:scale-95 dark:border-white/15 dark:bg-slate-950/70 dark:text-white sm:bottom-3 sm:left-3 whitespace-nowrap shrink-0"
+        >
+          <Rotate3d className="h-4 w-4 text-[#0068B5] dark:text-[#38BDF8]" />
+          <span>Swipe cabinet to spin</span>
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-full border border-slate-900/10 bg-white/75 px-3 py-1.5 text-[11px] font-bold text-slate-900 shadow-xs backdrop-blur-md transition-colors dark:border-white/15 dark:bg-slate-950/60 dark:text-white whitespace-nowrap shrink-0">
+          <Rotate3d className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
+          <span>Hover to orbit</span>
+        </div>
+      )}
 
       <button
         type="button"
         data-arcade-launch="true"
         onClick={() => {
+          triggerHaptic(14, globalMuted);
           cutVideoForLaunch();
           onRequestLaunch();
         }}
-        className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white/75 px-3.5 py-1.5 text-xs font-bold text-slate-900 shadow-xs backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-[#0068B5]/40 hover:text-[#0068B5] dark:border-white/15 dark:bg-slate-950/60 dark:text-white dark:hover:border-[#38BDF8]/50 dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
+        className="absolute bottom-2.5 right-2.5 z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-slate-900/15 bg-white/85 px-4 py-2 text-xs font-bold text-slate-900 shadow-xs backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-[#0068B5]/40 hover:text-[#0068B5] dark:border-white/15 dark:bg-slate-950/70 dark:text-white dark:hover:border-[#38BDF8]/50 dark:hover:text-[#38BDF8] sm:bottom-3 sm:right-3 whitespace-nowrap shrink-0"
       >
         <Play className="h-3.5 w-3.5 fill-[#0068B5] text-[#0068B5] dark:fill-[#38BDF8] dark:text-[#38BDF8]" />
         <span>Play Arcade</span>

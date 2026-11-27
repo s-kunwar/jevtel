@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, Pause, Shield } from 'lucide-react';
+import { LogOut, Pause, Shield, Volume2, VolumeX } from 'lucide-react';
 import { INTEL_HARDWARE_URLS, TINY_SWORDS_AVATARS, TINY_SWORDS_UI } from '../game/assets';
 import type { HudSnapshot } from '../game/types';
 
@@ -14,6 +14,8 @@ interface GameHudProps {
 
 export function GameHud({
   hud,
+  muted,
+  onToggleMute,
   onPause,
   onExitArcade,
   onOpenStoreModal,
@@ -23,12 +25,12 @@ export function GameHud({
   const heroAvatarUrl = TINY_SWORDS_AVATARS[hud.heroForm === 'pawn' ? 1 : 0];
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between p-2.5 sm:p-3">
+    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between p-2 sm:p-3">
       {/* Top Perimeter Clusters */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         {/* Top-Left: Compact Vitals Panel */}
-        <div className="ts-wood-compact flex items-center gap-2.5">
-          <div className="ts-special-panel relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden">
+        <div className="ts-wood-compact flex items-center gap-2 sm:gap-2.5">
+          <div className="ts-special-panel relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden sm:h-10 sm:w-10">
             {!portraitErr ? (
               <img
                 src={heroAvatarUrl}
@@ -38,15 +40,17 @@ export function GameHud({
                 className="pixelated h-full w-full object-contain"
               />
             ) : (
-              <Shield className="h-5 w-5 text-sky-300" />
+              <Shield className="h-4 w-4 text-sky-300 sm:h-5 sm:w-5" />
             )}
           </div>
 
-          <div className="min-w-[180px] space-y-1">
-            <div className="flex items-center justify-between gap-2 text-[11px]">
-              <span className="font-display font-bold text-[#FEF3C7]">{hud.pcLabel}</span>
+          <div className="min-w-[138px] space-y-0.5 sm:min-w-[180px] sm:space-y-1">
+            <div className="flex items-center justify-between gap-1.5 text-[10px] sm:gap-2 sm:text-[11px]">
+              <span className="max-w-[92px] truncate font-display font-bold text-[#FEF3C7] sm:max-w-none">
+                {hud.pcLabel}
+              </span>
               <span
-                className={`font-mono-tabular font-bold ${
+                className={`font-mono-tabular font-bold shrink-0 ${
                   isTrap ? 'text-red-300' : hud.fpsDisplay >= 100 ? 'text-cyan-300' : 'text-emerald-300'
                 }`}
               >
@@ -55,22 +59,24 @@ export function GameHud({
             </div>
 
             {/* HP Bar */}
-            <div className="flex items-center gap-1.5">
-              <img src={TINY_SWORDS_UI.icons.meat} alt="HP" referrerPolicy="no-referrer" className="pixelated h-3.5 w-3.5 shrink-0" />
-              <div className="ts-bar-frame relative h-3.5 flex-1 overflow-hidden">
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <img src={TINY_SWORDS_UI.icons.meat} alt="HP" referrerPolicy="no-referrer" className="pixelated h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
+              <div className="ts-bar-frame relative h-3 flex-1 overflow-hidden sm:h-3.5">
                 <div
                   className="h-full bg-gradient-to-b from-rose-400 via-red-500 to-red-700 transition-all duration-150"
                   style={{ width: `${Math.max(0, Math.min(100, (hud.hp / hud.maxHp) * 100))}%` }}
                 />
               </div>
-              <span className="w-7 text-right font-mono-tabular text-[11px] font-bold text-[#FEF3C7]">{hud.hp}</span>
+              <span className="w-6 text-right font-mono-tabular text-[10px] font-bold text-[#FEF3C7] sm:w-7 sm:text-[11px]">
+                {hud.hp}
+              </span>
             </div>
 
             {/* Battery & NPU Row */}
-            <div className="flex items-center justify-between gap-2 text-[10px]">
+            <div className="flex items-center justify-between gap-1.5 text-[9px] sm:gap-2 sm:text-[10px]">
               <div className="flex flex-1 items-center gap-1">
                 <span className="font-mono-tabular font-bold text-[#FDE68A]">BAT</span>
-                <div className="ts-bar-frame relative h-3 flex-1 overflow-hidden">
+                <div className="ts-bar-frame relative h-2.5 flex-1 overflow-hidden sm:h-3">
                   <div
                     className={`h-full transition-all duration-150 ${
                       hud.battery <= 25
@@ -86,8 +92,8 @@ export function GameHud({
               </div>
 
               {hud.hasNpuPulse && !hud.inExpoPark && (
-                <span className="inline-flex items-center gap-1 font-mono-tabular font-bold text-cyan-300">
-                  <img src={INTEL_HARDWARE_URLS.chip} alt="" referrerPolicy="no-referrer" className="pixelated h-3 w-3" />
+                <span className="inline-flex items-center gap-0.5 font-mono-tabular font-bold text-cyan-300 sm:gap-1">
+                  <img src={INTEL_HARDWARE_URLS.chip} alt="" referrerPolicy="no-referrer" className="pixelated h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   <span>{hud.npuCharge}%</span>
                 </span>
               )}
@@ -95,8 +101,8 @@ export function GameHud({
           </div>
         </div>
 
-        {/* Top-Right: Compact Objective + Pause + Clear Always-Visible Exit */}
-        <div className="flex items-start gap-2">
+        {/* Top-Right: Compact Objective + Store + Audio + Pause (+ Desktop Exit) */}
+        <div className="flex items-start gap-1.5 sm:gap-2">
           <div className="ts-paper-panel hidden max-w-[260px] text-right sm:block">
             <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-[#6E492D]">
               <span>{hud.districtTitle}</span>
@@ -115,26 +121,37 @@ export function GameHud({
               <button
                 type="button"
                 onClick={onOpenStoreModal}
-                className="ts-btn-blue inline-flex h-9 items-center gap-1.5 px-2.5 font-display text-xs font-bold text-white whitespace-nowrap shrink-0"
+                className="ts-btn-blue inline-flex h-10 items-center gap-1 px-2 font-display text-[11px] font-bold text-white sm:h-9 sm:gap-1.5 sm:px-2.5 sm:text-xs whitespace-nowrap shrink-0"
               >
                 <img src={TINY_SWORDS_UI.icons.info} alt="" referrerPolicy="no-referrer" className="pixelated h-3.5 w-3.5" />
-                <span>Store [C]</span>
+                <span>Store</span>
+                <span className="hidden sm:inline">[C]</span>
               </button>
             )}
             <button
               type="button"
+              onClick={onToggleMute}
+              title={muted ? 'Unmute Audio [M]' : 'Mute Audio [M]'}
+              aria-label={muted ? 'Unmute Audio' : 'Mute Audio'}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-[#0B1120] bg-[#1E293B]/95 text-[#F8FAFC] shadow-md transition-colors hover:border-[#38BDF8] hover:bg-[#0F172A] md:hidden whitespace-nowrap shrink-0"
+            >
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
               onClick={onPause}
               title="Pause [Esc]"
-              className="inline-flex h-9 items-center gap-1 rounded-lg border-2 border-[#0B1120] bg-[#1E293B]/95 px-2.5 text-xs font-bold text-[#F8FAFC] shadow-md transition-colors hover:border-[#38BDF8] hover:bg-[#0F172A] whitespace-nowrap shrink-0"
+              aria-label="Pause Game"
+              className="inline-flex h-10 w-10 items-center justify-center gap-1 rounded-lg border-2 border-[#0B1120] bg-[#1E293B]/95 text-xs font-bold text-[#F8FAFC] shadow-md transition-colors hover:border-[#38BDF8] hover:bg-[#0F172A] sm:h-9 sm:w-auto sm:px-2.5 whitespace-nowrap shrink-0"
             >
-              <Pause className="h-3.5 w-3.5" />
+              <Pause className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
               <span className="hidden md:inline">Pause</span>
             </button>
             <button
               type="button"
               onClick={onExitArcade}
               title="Exit Game"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border-2 border-[#0B1120] bg-[#DC2626] px-3 text-xs font-extrabold text-white shadow-md transition-colors hover:bg-[#B91C1C] whitespace-nowrap shrink-0"
+              className="hidden h-9 items-center gap-1.5 rounded-lg border-2 border-[#0B1120] bg-[#DC2626] px-3 text-xs font-extrabold text-white shadow-md transition-colors hover:bg-[#B91C1C] md:inline-flex whitespace-nowrap shrink-0"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>Exit</span>
@@ -145,17 +162,17 @@ export function GameHud({
 
       {/* Transient District / Phase Ribbon Banner */}
       {hud.bannerText && (
-        <div className="mx-auto my-2">
-          <div className="ts-ribbon ts-ribbon-Blue px-8 py-1 text-center font-display text-xs font-bold tracking-wider sm:text-sm">
+        <div className="mx-auto my-2 max-w-[92%]">
+          <div className="ts-ribbon ts-ribbon-Blue px-5 py-1 text-center font-display text-[11px] font-bold tracking-wider sm:px-8 sm:text-sm">
             {hud.bannerText}
           </div>
         </div>
       )}
 
       {/* Bottom Center: Only Interactive Nearby Prompt when beside NPC / Exhibit */}
-      <div className="flex min-h-[28px] items-end justify-center">
+      <div className="flex min-h-[24px] items-end justify-center">
         {hud.nearbyPrompt && (
-          <div className="ts-paper-panel font-display text-xs font-bold text-[#2B1B12] sm:text-sm">
+          <div className="ts-paper-panel max-w-[92%] text-center font-display text-[11px] font-bold text-[#2B1B12] sm:text-sm">
             {hud.nearbyPrompt}
           </div>
         )}

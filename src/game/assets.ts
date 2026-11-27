@@ -40,6 +40,10 @@ import courtyardStallCreatorRaw from '../assets/images/courtyard_stall_creator_1
 import courtyardStonePlazaRaw from '../assets/images/courtyard_stone_plaza_1795770340532.jpg';
 import courtyardStonePathRaw from '../assets/images/courtyard_stone_path_1795770340743.jpg';
 import courtyardFestivalArchRaw from '../assets/images/courtyard_festival_arch_1795770339425.jpg';
+import arcadeDeckBaseplateArt from '../assets/images/arcade_deck_baseplate_1795795779315.jpg';
+import arcadeBtnCobaltCrestArt from '../assets/images/arcade_btn_cobalt_crest_1795795779448.jpg';
+import arcadeBtnEmeraldCrestArt from '../assets/images/arcade_btn_emerald_crest_1795795779504.jpg';
+import arcadeBtnAmberCrestArt from '../assets/images/arcade_btn_amber_crest_1795795780002.jpg';
 
 export type FactionColor = 'Blue' | 'Red' | 'Yellow' | 'Purple' | 'Black';
 
@@ -88,6 +92,13 @@ export const ARCADE_CABINET_ART_URLS = {
   rightPanel: arcadeSideRightArt,
   frontTinySwords: arcadeFrontTinySwordsArt,
   marqueeTinySwords: arcadeMarqueeTinySwordsBanner,
+};
+
+export const MOBILE_DECK_ART_URLS = {
+  baseplate: arcadeDeckBaseplateArt,
+  cobaltButton: arcadeBtnCobaltCrestArt,
+  emeraldButton: arcadeBtnEmeraldCrestArt,
+  amberButton: arcadeBtnAmberCrestArt,
 };
 
 const TS_BASE = '/assets/tiny_swords';
@@ -258,16 +269,54 @@ function makeFallbackImage(): HTMLImageElement {
   return img;
 }
 
+export const PRELOADED_IMAGE_CACHE = new Map<string, HTMLImageElement>();
+const inflightImageLoads = new Map<string, Promise<HTMLImageElement>>();
+
+export function getCachedImageSync(src: string): HTMLImageElement | undefined {
+  const cached = PRELOADED_IMAGE_CACHE.get(src);
+  if (cached && cached.complete && cached.naturalWidth > 0) {
+    return cached;
+  }
+  return undefined;
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve) => {
+  const existing = getCachedImageSync(src);
+  if (existing) return Promise.resolve(existing);
+
+  const inflight = inflightImageLoads.get(src);
+  if (inflight) return inflight;
+
+  const p = new Promise<HTMLImageElement>((resolve) => {
     const img = new Image();
-    img.onload = () => resolve(img);
+    img.decoding = 'async';
+    img.onload = async () => {
+      try {
+        if (typeof img.decode === 'function') {
+          await img.decode().catch(() => undefined);
+        }
+      } catch {
+        // Ignore decode warning; image is already loaded
+      }
+      PRELOADED_IMAGE_CACHE.set(src, img);
+      inflightImageLoads.delete(src);
+      resolve(img);
+    };
     img.onerror = () => {
+      inflightImageLoads.delete(src);
       console.warn(`Tiny Swords sprite failed to load, using fallback: ${src}`);
-      resolve(makeFallbackImage());
+      const fallback = makeFallbackImage();
+      resolve(fallback);
     };
     img.src = src;
   });
+
+  inflightImageLoads.set(src, p);
+  return p;
+}
+
+export function getPreloadedOrLoadImage(src: string): Promise<HTMLImageElement> {
+  return loadImage(src);
 }
 
 function stripWhiteBackground(img: HTMLImageElement, maxDim = 320): HTMLCanvasElement {
@@ -829,3 +878,79 @@ export async function initTinySwordsUiSkins(): Promise<void> {
     // Non-fatal: CSS fallback frames still render cleanly
   }
 }
+
+let cachedProPreloadPromise: Promise<void> | null = null;
+let currentProProgressPct = 0;
+const proProgressListeners = new Set<(pct: number) => void>();
+
+function waitForFontsWithCap(timeoutMs = 3000): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts?.ready) {
+    return Promise.resolve();
+  }
+  return Promise.race([
+    document.fonts.ready.then(() => undefined).catch(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs)),
+  ]);
+}
+
+export function preloadAllProBuilderAssets(
+  onProgress?: (pct: number) => void
+): Promise<void> {
+  if (typeof window === 'undefined') {
+    onProgress?.(100);
+    return Promise.resolve();
+  }
+
+  if (onProgress) {
+    proProgressListeners.add(onProgress);
+    onProgress(currentProProgressPct);
+  }
+
+  if (cachedProPreloadPromise) {
+    return cachedProPreloadPromise;
+  }
+
+  const tinySwordsUiUrls = Object.values(TINY_SWORDS_UI).flatMap((val) =>
+    typeof val === 'string' ? [val] : Object.values(val)
+  );
+
+  const staticUrls = Array.from(
+    new Set([
+      '/assets/aistudio/hero_ruins_backdrop.webp',
+      '/assets/aistudio/cyberpunk_preloader.webp',
+      ...Object.values(EDITORIAL_ART_URLS),
+      ...Object.values(ARCADE_CABINET_ART_URLS),
+      ...Object.values(MOBILE_DECK_ART_URLS),
+      ...Object.values(INTEL_REAL_PHOTO_URLS),
+      ...Object.values(INTEL_HARDWARE_URLS),
+      ...TINY_SWORDS_AVATARS,
+      ...tinySwordsUiUrls,
+    ])
+  );
+
+  const totalUnits = staticUrls.length + 3; // +1 UI skins, +1 Tiny Swords atlas, +1 web fonts
+  let completedUnits = 0;
+
+  const emitProgress = (pct: number) => {
+    currentProProgressPct = pct;
+    proProgressListeners.forEach((cb) => cb(pct));
+  };
+
+  const tickProgress = () => {
+    completedUnits += 1;
+    const pct = Math.min(99, Math.round((completedUnits / totalUnits) * 100));
+    emitProgress(pct);
+  };
+
+  cachedProPreloadPromise = Promise.all([
+    waitForFontsWithCap(3000).finally(tickProgress),
+    initTinySwordsUiSkins().finally(tickProgress),
+    loadTinySwordsAtlas().finally(tickProgress),
+    ...staticUrls.map((url) => loadImage(url).finally(tickProgress)),
+  ]).then(() => {
+    emitProgress(100);
+  });
+
+  return cachedProPreloadPromise;
+}
+

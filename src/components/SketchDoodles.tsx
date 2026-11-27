@@ -260,8 +260,8 @@ export function IntelBlueprintDivider({
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none relative mx-auto flex max-w-[1200px] items-center justify-center gap-4 px-6 select-none md:px-10 ${
-        roamingVariant ? 'pt-9 pb-3' : 'py-3'
+      className={`pointer-events-none relative mx-auto flex max-w-[1200px] items-center justify-center gap-2.5 px-3 select-none sm:gap-4 sm:px-6 md:px-10 ${
+        roamingVariant ? 'pt-7 pb-2.5 sm:pt-9 sm:pb-3' : 'py-3'
       } ${className}`}
     >
       {roamingVariant && <LandingRoamingTrack variant={roamingVariant} />}
@@ -269,7 +269,7 @@ export function IntelBlueprintDivider({
       <svg
         viewBox="0 0 420 34"
         fill="none"
-        className="h-7 flex-1 text-[#0068B5] opacity-30 dark:text-[#38BDF8] dark:opacity-25"
+        className="h-6 flex-1 text-[#0068B5] opacity-30 dark:text-[#38BDF8] dark:opacity-25 sm:h-7"
         preserveAspectRatio="none"
       >
         <path
@@ -291,8 +291,8 @@ export function IntelBlueprintDivider({
       </svg>
 
       {/* Center Minimal Intel Silicon Wafer Cross-Section Seal */}
-      <div className="relative flex items-center gap-3 px-2 opacity-65 dark:opacity-55">
-        <svg viewBox="0 0 56 56" fill="none" className="h-10 w-10 shrink-0">
+      <div className="relative flex items-center gap-2 px-1 opacity-70 dark:opacity-60 sm:gap-3 sm:px-2">
+        <svg viewBox="0 0 56 56" fill="none" className="h-8 w-8 shrink-0 sm:h-10 sm:w-10">
           {/* Outer octagonal wafer ring */}
           <polygon
             points="18,4 38,4 52,18 52,38 38,52 18,52 4,38 4,18"
@@ -347,11 +347,11 @@ export function IntelBlueprintDivider({
         </svg>
 
         <div className="flex flex-col leading-none">
-          <span className="font-mono-tabular text-[10px] font-bold tracking-[0.22em] text-[#0068B5] dark:text-[#38BDF8]">
+          <span className="font-mono-tabular text-[9px] font-bold tracking-[0.16em] text-[#0068B5] dark:text-[#38BDF8] sm:text-[10px] sm:tracking-[0.22em]">
             intel · CORE ULTRA
           </span>
           {label && (
-            <span className="mt-1 font-mono-tabular text-[9px] font-medium tracking-wider text-[#64748B] dark:text-[#94A3B8]">
+            <span className="mt-1 font-mono-tabular text-[8px] font-medium tracking-wider text-[#64748B] dark:text-[#94A3B8] sm:text-[9px]">
               {label}
             </span>
           )}

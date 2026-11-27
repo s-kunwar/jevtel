@@ -32,27 +32,27 @@ export function HardwareDetailModal({ spec, onClose }: HardwareDetailModalProps)
 
   return (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-xs md:p-6"
+      className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/75 p-2.5 backdrop-blur-xs sm:p-4 md:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="hardware-modal-title"
     >
-      <div className="ts-wood-panel max-h-[92vh] w-full max-w-5xl overflow-y-auto">
+      <div className="ts-wood-panel max-h-[86dvh] w-full max-w-5xl overflow-y-auto">
         {/* Top Wooden Frame Bar: Faction Ribbon + Category Subtitle + Close */}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div
-              className={`ts-ribbon ts-ribbon-${spec.factionColor} inline-flex items-center gap-2 font-display text-sm font-bold tracking-wide md:text-base`}
+              className={`ts-ribbon ts-ribbon-${spec.factionColor} inline-flex items-center gap-2 font-display text-xs font-bold tracking-wide sm:text-sm md:text-base`}
             >
               <img
                 src={pixelSpriteUrl}
                 alt={spec.title}
                 referrerPolicy="no-referrer"
-                className="pixelated h-5 w-5 object-contain"
+                className="pixelated h-4 w-4 object-contain sm:h-5 sm:w-5"
               />
               <span>{spec.category}</span>
             </div>
-            <span className="font-mono-tabular text-xs font-semibold text-[#FDE68A]">
+            <span className="font-mono-tabular text-[11px] font-semibold text-[#FDE68A] sm:text-xs">
               {spec.subtitle}
             </span>
           </div>
@@ -60,7 +60,7 @@ export function HardwareDetailModal({ spec, onClose }: HardwareDetailModalProps)
           <button
             type="button"
             onClick={onClose}
-            className="ts-btn-red inline-flex items-center gap-2 font-display text-xs font-bold text-white whitespace-nowrap shrink-0"
+            className="ts-btn-red inline-flex min-h-[44px] items-center gap-1.5 font-display text-xs font-bold text-white sm:min-h-0 sm:gap-2 whitespace-nowrap shrink-0"
           >
             <img
               src={TINY_SWORDS_UI.icons.close}
@@ -68,13 +68,14 @@ export function HardwareDetailModal({ spec, onClose }: HardwareDetailModalProps)
               referrerPolicy="no-referrer"
               className="pixelated h-4 w-4"
             />
-            <span>Close [E / Esc]</span>
+            <span>Close</span>
+            <span className="hidden sm:inline">[E / Esc]</span>
           </button>
         </div>
 
         {/* Parchment Main Content */}
         <div className="ts-paper-panel">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-stretch">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-stretch lg:gap-6">
             {/* Left Column: Studio Product Photo + Pixel Badge + Official Intel.com Redirect */}
             <div className="flex flex-col justify-between gap-4 lg:col-span-5">
               <div className="relative overflow-hidden rounded-lg border-2 border-[#8c6b42] bg-[#0f172a]">
@@ -84,10 +85,10 @@ export function HardwareDetailModal({ spec, onClose }: HardwareDetailModalProps)
                     alt={`${spec.title} hardware photography`}
                     referrerPolicy="no-referrer"
                     onError={() => setPhotoErr(true)}
-                    className="h-60 w-full object-cover sm:h-72"
+                    className="h-44 w-full object-cover sm:h-64 md:h-72"
                   />
                 ) : (
-                  <div className="flex h-60 w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#0f172a] to-[#1e3a5f] p-4 text-center sm:h-72">
+                  <div className="flex h-44 w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#0f172a] to-[#1e3a5f] p-4 text-center sm:h-64 md:h-72">
                     <Cpu className="h-12 w-12 text-sky-400" />
                     <span className="font-display text-sm font-bold text-slate-100">
                       {spec.title}
@@ -100,7 +101,7 @@ export function HardwareDetailModal({ spec, onClose }: HardwareDetailModalProps)
                     <div className="text-xs font-medium text-slate-200">
                       Real-World Hardware Reference
                     </div>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-sky-400/50 bg-slate-900/85 p-1">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-sky-400/50 bg-slate-900/85 p-1 sm:h-12 sm:w-12">
                       <img
                         src={pixelSpriteUrl}
                         alt=""
@@ -112,11 +113,11 @@ export function HardwareDetailModal({ spec, onClose }: HardwareDetailModalProps)
                 </div>
               </div>
 
-              <div className="rounded-md border border-[#b59463] bg-[#e2d1ae] p-4">
+              <div className="rounded-md border border-[#b59463] bg-[#e2d1ae] p-3.5 sm:p-4">
                 <div className="font-display text-xs font-bold tracking-wider text-[#5c3a25]">
                   WHY THIS MATTERS
                 </div>
-                <p className="mt-1.5 text-sm font-medium leading-relaxed text-[#2B1B12]">
+                <p className="mt-1.5 text-xs font-medium leading-relaxed text-[#2B1B12] sm:text-sm">
                   {spec.whyItMatters}
                 </p>
               </div>
@@ -126,7 +127,7 @@ export function HardwareDetailModal({ spec, onClose }: HardwareDetailModalProps)
                   href={spec.officialUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ts-btn-blue inline-flex w-full items-center justify-center gap-2.5 font-display text-sm font-bold text-white whitespace-nowrap"
+                  className="ts-btn-blue inline-flex min-h-[44px] w-full items-center justify-center gap-2.5 font-display text-xs font-bold text-white sm:text-sm whitespace-nowrap"
                 >
                   <span>{spec.officialLabel}</span>
                   <ExternalLink className="h-4 w-4 shrink-0" />

@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react';
+import { triggerHaptic } from '../game/haptics';
 import { EDITORIAL_ART_URLS } from '../game/assets';
 import {
   COOLING_OPTIONS,
@@ -73,6 +76,8 @@ export function PreferenceProductsSection({
   const [retailerFilter, setRetailerFilter] = useState<CatalogRetailerId>('all');
   const [copiedSkuId, setCopiedSkuId] = useState<string | null>(null);
   const [loadedProductId, setLoadedProductId] = useState<string | null>(null);
+  const [activeSlideIdx, setActiveSlideIdx] = useState(0);
+  const carouselRef = useRef<HTMLDivElement | null>(null);
 
   const rankedItems = rankCatalogByPreferences(
     builderConfig,
@@ -80,6 +85,33 @@ export function PreferenceProductsSection({
     retailerFilter,
     questMatchedPcId
   );
+
+  useEffect(() => {
+    setActiveSlideIdx(0);
+    if (carouselRef.current) {
+      carouselRef.current.scrollTo({ left: 0, behavior: 'auto' });
+    }
+  }, [retailerFilter, builderConfig.processor, builderConfig.graphics]);
+
+  const handleCarouselScroll = () => {
+    const el = carouselRef.current;
+    if (!el || rankedItems.length === 0) return;
+    const cardWidth = Math.max(1, el.clientWidth * 0.86);
+    const idx = Math.round(el.scrollLeft / cardWidth);
+    setActiveSlideIdx(Math.max(0, Math.min(rankedItems.length - 1, idx)));
+  };
+
+  const scrollToSlide = (idx: number) => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const clamped = Math.max(0, Math.min(rankedItems.length - 1, idx));
+    const child = el.children[clamped] as HTMLElement | undefined;
+    if (child) {
+      child.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    }
+    setActiveSlideIdx(clamped);
+    triggerHaptic(6);
+  };
 
   const cpuLabel =
     PROCESSOR_OPTIONS.find((p) => p.id === builderConfig.processor)?.label ?? 'Core Ultra';
@@ -117,31 +149,31 @@ export function PreferenceProductsSection({
   return (
     <section
       id="recommended-products"
-      className="relative overflow-hidden border-t border-[#E5E7EB] bg-[#FAF8F5] py-12 transition-colors duration-200 dark:border-[#1F2937] dark:bg-[#0B1120] lg:py-16"
+      className="relative overflow-hidden border-t border-[#E5E7EB] bg-[#FAF8F5] py-10 transition-colors duration-200 dark:border-[#1F2937] dark:bg-[#0B1120] sm:py-12 lg:py-16"
     >
-      <div className="relative mx-auto max-w-[1280px] px-5 md:px-10">
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-5 md:px-10">
         {/* Section Header + Retailer Filter Tabs */}
-        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+        <div className="flex flex-col justify-between gap-4 sm:gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
             <h2
-              className="font-editorial text-3xl font-bold leading-[1.08] tracking-tight text-[#111827] dark:text-[#F3F4F6] md:text-4xl"
+              className="font-editorial text-2xl font-bold leading-[1.1] tracking-tight text-[#111827] dark:text-[#F3F4F6] sm:text-3xl md:text-4xl"
               style={{ textWrap: 'balance' }}
             >
               Laptops Matched to Your Exact Preferences
             </h2>
             <HandUnderline className="mt-1.5 max-w-md" />
-            <p className="mt-3 text-base leading-relaxed text-[#4B5563] dark:text-[#9CA3AF]">
+            <p className="mt-3 text-sm leading-relaxed text-[#4B5563] dark:text-[#9CA3AF] sm:text-base">
               Ranked live from your{' '}
               {matchSource === 'quest' ? 'adventure with Byte' : 'PC Builder configuration'} across
               Amazon India, Croma, Vijay Sales, and Reliance Digital.
             </p>
           </div>
 
-          {/* Segmented Retailer Filter Tabs */}
+          {/* Segmented Retailer Filter Tabs (Horizontal Scroll Strip on Phones) */}
           <div
             role="tablist"
             aria-label="Filter laptops by retailer"
-            className="inline-flex flex-wrap gap-1 rounded-xl border border-[#E5E7EB] bg-white p-1 dark:border-[#1F2937] dark:bg-[#111827]"
+            className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[#E5E7EB] bg-white p-1 dark:border-[#1F2937] dark:bg-[#111827] md:inline-flex md:flex-wrap"
           >
             {CATALOG_RETAILERS.map((retailer) => {
               const active = retailer.id === retailerFilter;
@@ -151,8 +183,11 @@ export function PreferenceProductsSection({
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setRetailerFilter(retailer.id)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                  onClick={() => {
+                    triggerHaptic(8);
+                    setRetailerFilter(retailer.id);
+                  }}
+                  className={`min-h-[40px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 md:min-h-[34px] ${
                     active
                       ? 'bg-[#0068B5] text-white'
                       : 'text-[#4B5563] hover:text-[#111827] dark:text-[#9CA3AF] dark:hover:text-[#F3F4F6]'
@@ -165,9 +200,9 @@ export function PreferenceProductsSection({
           </div>
         </div>
 
-        {/* Active Requirement Criteria Strip (Clean Monospace Architectural Row) */}
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs dark:border-[#1F2937] dark:bg-[#111827]">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[#374151] dark:text-[#D1D5DB]">
+        {/* Active Requirement Criteria Strip (Clean Monospace Architectural Row, hidden on compact phones) */}
+        <div className="mt-5 hidden flex-wrap items-center justify-between gap-2.5 rounded-xl border border-[#E5E7EB] bg-white px-3.5 py-2.5 text-xs dark:border-[#1F2937] dark:bg-[#111827] sm:mt-6 sm:flex sm:gap-3 sm:px-4 sm:py-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[#374151] dark:text-[#D1D5DB] sm:gap-x-4 sm:gap-y-1.5">
             <span className="font-mono-tabular font-bold text-[#0068B5] dark:text-[#38BDF8]">
               Active Spec Filter:
             </span>
@@ -186,10 +221,10 @@ export function PreferenceProductsSection({
               ·
             </span>
             <span>{ssdLabel}</span>
-            <span aria-hidden="true" className="text-[#CBD5E1] dark:text-[#334155]">
+            <span aria-hidden="true" className="hidden text-[#CBD5E1] dark:text-[#334155] sm:inline">
               ·
             </span>
-            <span>{coolLabel}</span>
+            <span className="hidden sm:inline">{coolLabel}</span>
             <span aria-hidden="true" className="text-[#CBD5E1] dark:text-[#334155]">
               ·
             </span>
@@ -200,15 +235,44 @@ export function PreferenceProductsSection({
 
           <a
             href="#pc-builder"
-            className="inline-flex items-center gap-1.5 font-semibold text-[#0068B5] hover:underline dark:text-[#38BDF8] whitespace-nowrap shrink-0"
+            className="inline-flex min-h-[36px] items-center gap-1.5 font-semibold text-[#0068B5] hover:underline dark:text-[#38BDF8] whitespace-nowrap shrink-0"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             <span>Change Specs</span>
           </a>
         </div>
 
-        {/* Uniform Editorial Product Grid (3-col Desktop, 2-col Tablet, Consistent 4:3 Imagery) */}
-        <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Mobile Swipe Header Hint */}
+        <div className="mt-5 flex items-center justify-between text-xs font-semibold text-[#6B7280] dark:text-[#9CA3AF] md:hidden">
+          <span>Swipe cards ({activeSlideIdx + 1} of {rankedItems.length})</span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => scrollToSlide(activeSlideIdx - 1)}
+              disabled={activeSlideIdx <= 0}
+              aria-label="Previous laptop"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#111827] disabled:opacity-35 dark:border-[#334155] dark:bg-[#111827] dark:text-[#F3F4F6]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSlide(activeSlideIdx + 1)}
+              disabled={activeSlideIdx >= rankedItems.length - 1}
+              aria-label="Next laptop"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#111827] disabled:opacity-35 dark:border-[#334155] dark:bg-[#111827] dark:text-[#F3F4F6]"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Horizontal Snap Carousel on Phones -> Editorial Multi-Column Grid on Tablet/Desktop */}
+        <div
+          ref={carouselRef}
+          onScroll={handleCarouselScroll}
+          className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 md:mt-8 md:grid md:grid-cols-2 md:gap-6 md:overflow-visible md:pb-0 lg:grid-cols-3"
+        >
           {rankedItems.map(({ product, matchPct, isTopMatch, matchReasons }) => {
             const copied = copiedSkuId === product.id;
             const loaded = loadedProductId === product.id;
@@ -216,7 +280,7 @@ export function PreferenceProductsSection({
             return (
               <article
                 key={product.id}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[#111827]/35 hover:shadow-md dark:border-[#1F2937] dark:bg-[#111827] dark:hover:border-[#38BDF8]/50"
+                className="group flex w-[86vw] max-w-[360px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-[#111827]/35 hover:shadow-md dark:border-[#1F2937] dark:bg-[#111827] dark:hover:border-[#38BDF8]/50 md:w-auto md:max-w-none md:shrink"
               >
                 {/* 4:3 Bespoke Pen-and-Ink Hardware Illustration Frame */}
                 <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#E5E7EB] bg-[#FAF8F5] dark:border-[#1F2937] dark:bg-[#18181B]">
@@ -266,7 +330,7 @@ export function PreferenceProductsSection({
                     </div>
 
                     {/* Why It Matches Your Preferences */}
-                    <p className="mt-2 text-xs leading-relaxed text-[#4B5563] dark:text-[#9CA3AF]">
+                    <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#4B5563] dark:text-[#9CA3AF] sm:line-clamp-none">
                       {matchReasons.join(' · ')}
                     </p>
 
@@ -303,13 +367,13 @@ export function PreferenceProductsSection({
                     </dl>
                   </div>
 
-                  {/* Contiguous Action Row */}
+                  {/* Contiguous Action Row (>= 44px touch hitboxes) */}
                   <div className="mt-5 flex items-center gap-2 border-t border-[#E5E7EB] pt-4 dark:border-[#1F2937]">
                     <a
                       href={product.storeSearchUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0068B5] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#005291] whitespace-nowrap"
+                      className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0068B5] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#005291] md:min-h-[36px] whitespace-nowrap"
                     >
                       <span>View at {product.retailerName}</span>
                       <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
@@ -317,31 +381,33 @@ export function PreferenceProductsSection({
 
                     <button
                       type="button"
-                      onClick={() =>
-                        handleLoadIntoBuilder(product.id, { ...product.builderMatch })
-                      }
+                      onClick={() => {
+                        triggerHaptic(10);
+                        handleLoadIntoBuilder(product.id, { ...product.builderMatch });
+                      }}
                       title="Load these exact laptop parts into the PC Builder above"
-                      className="inline-flex items-center justify-center rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-2.5 py-2 text-xs font-semibold text-[#111827] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#E5E7EB] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 text-xs font-semibold text-[#111827] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#E5E7EB] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8] md:min-h-[36px] md:px-2.5 whitespace-nowrap shrink-0"
                     >
                       {loaded ? 'Synced' : 'Test Build'}
                     </button>
 
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        triggerHaptic(8);
                         handleCopySku(
                           product.id,
                           `${product.brand} ${product.name} (${product.retailerName} SKU: ${product.storeSku}) — ${product.processorLabel}, ${product.ramLabel}, ${product.storageLabel} @ ${formatInrPrice(product.priceInr)}`
-                        )
-                      }
+                        );
+                      }}
                       aria-label={`Copy ${product.brand} ${product.name} store SKU`}
                       title={`Copy Store SKU (${product.storeSku})`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] text-[#4B5563] transition-colors hover:border-[#111827] hover:text-[#111827] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#9CA3AF] dark:hover:border-[#38BDF8] dark:hover:text-[#F3F4F6] shrink-0"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] text-[#4B5563] transition-colors hover:border-[#111827] hover:text-[#111827] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#9CA3AF] dark:hover:border-[#38BDF8] dark:hover:text-[#F3F4F6] md:h-9 md:w-9 shrink-0"
                     >
                       {copied ? (
-                        <Check className="h-3.5 w-3.5 text-[#059669] dark:text-[#34D399]" />
+                        <Check className="h-4 w-4 text-[#059669] dark:text-[#34D399]" />
                       ) : (
-                        <Copy className="h-3.5 w-3.5" />
+                        <Copy className="h-4 w-4" />
                       )}
                     </button>
                   </div>
@@ -350,6 +416,25 @@ export function PreferenceProductsSection({
             );
           })}
         </div>
+
+        {/* Mobile Carousel Pagination Dots */}
+        {rankedItems.length > 1 && (
+          <div className="mt-4 flex items-center justify-center gap-2 md:hidden">
+            {rankedItems.map(({ product }, idx) => (
+              <button
+                key={product.id}
+                type="button"
+                aria-label={`View matched laptop ${idx + 1}`}
+                onClick={() => scrollToSlide(idx)}
+                className={`h-2.5 rounded-full transition-all ${
+                  idx === activeSlideIdx
+                    ? 'w-7 bg-[#0068B5] dark:bg-[#38BDF8]'
+                    : 'w-2.5 bg-[#CBD5E1] dark:bg-[#334155]'
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

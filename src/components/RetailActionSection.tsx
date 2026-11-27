@@ -78,19 +78,19 @@ export function RetailActionSection({
   return (
     <section
       id="store-guide"
-      className="relative overflow-hidden bg-[#FAF8F5] py-12 transition-colors duration-200 dark:bg-[#0B1120] lg:py-16"
+      className="relative overflow-hidden bg-[#FAF8F5] py-10 transition-colors duration-200 dark:bg-[#0B1120] sm:py-12 lg:py-16"
     >
-      <div className="relative mx-auto max-w-[1280px] px-5 md:px-10">
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-5 md:px-10">
         {/* Header */}
         <div className="max-w-2xl">
           <h2
-            className="font-editorial text-3xl font-bold leading-[1.08] tracking-tight text-[#111827] dark:text-[#F3F4F6] md:text-4xl"
+            className="font-editorial text-2xl font-bold leading-[1.1] tracking-tight text-[#111827] dark:text-[#F3F4F6] sm:text-3xl md:text-4xl"
             style={{ textWrap: 'balance' }}
           >
             Your Store Floor Match &amp; Verification Checklist
           </h2>
           <HandUnderline className="mt-1.5 max-w-md" />
-          <p className="mt-3 text-base leading-relaxed text-[#4B5563] dark:text-[#9CA3AF]">
+          <p className="mt-3 text-sm leading-relaxed text-[#4B5563] dark:text-[#9CA3AF] sm:text-base">
             Synced directly from your{' '}
             {matchSource === 'quest' ? 'quest with Byte' : 'interactive laptop setup'}. Ask for
             this exact Intel Core Ultra model and check four simple details in the store.
@@ -98,9 +98,9 @@ export function RetailActionSection({
         </div>
 
         {/* Two-Column Closer Grid */}
-        <div className="mt-10 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        <div className="mt-7 grid grid-cols-1 items-stretch gap-5 sm:mt-10 sm:gap-6 lg:grid-cols-12">
           {/* Left Half: Auto-Synced "Your Store Floor Match" Card */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-6 transition-colors dark:border-[#1F2937] dark:bg-[#111827] md:p-8 lg:col-span-6">
+          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-4 transition-colors dark:border-[#1F2937] dark:bg-[#111827] sm:p-6 md:p-8 lg:col-span-6">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] pb-4 dark:border-[#1F2937]">
                 <h3 className="font-editorial text-2xl font-bold text-[#111827] dark:text-[#F3F4F6]">
@@ -144,38 +144,40 @@ export function RetailActionSection({
               </div>
 
               {/* Active Workbench Configuration Summary */}
-              <div className="mt-6 space-y-2 border-t border-[#E5E7EB] pt-5 text-xs dark:border-[#1F2937]">
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-[#6B7280] dark:text-[#9CA3AF]">Processor</span>
-                  <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                    {selectedCpuLabel}
-                  </span>
+              <div className="mt-5 border-t border-[#E5E7EB] pt-4 text-xs dark:border-[#1F2937] sm:mt-6 sm:pt-5">
+                <div className="hidden space-y-2 pb-2.5 sm:block">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-[#6B7280] dark:text-[#9CA3AF]">Processor</span>
+                    <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                      {selectedCpuLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-[#6B7280] dark:text-[#9CA3AF]">Graphics</span>
+                    <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                      {selectedGpuLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-[#6B7280] dark:text-[#9CA3AF]">Memory</span>
+                    <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                      {selectedMemLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-[#6B7280] dark:text-[#9CA3AF]">Storage</span>
+                    <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                      {selectedSsdLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-[#6B7280] dark:text-[#9CA3AF]">Cooling</span>
+                    <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                      {selectedCoolLabel}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-[#6B7280] dark:text-[#9CA3AF]">Graphics</span>
-                  <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                    {selectedGpuLabel}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-[#6B7280] dark:text-[#9CA3AF]">Memory</span>
-                  <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                    {selectedMemLabel}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-[#6B7280] dark:text-[#9CA3AF]">Storage</span>
-                  <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                    {selectedSsdLabel}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-[#6B7280] dark:text-[#9CA3AF]">Cooling</span>
-                  <span className="text-right font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                    {selectedCoolLabel}
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between gap-4 border-t border-dashed border-[#E5E7EB] pt-2.5 dark:border-[#334155]">
+                <div className="flex items-baseline justify-between gap-4 sm:border-t sm:border-dashed sm:border-[#E5E7EB] sm:pt-2.5 dark:sm:border-[#334155]">
                   <span className="text-[#6B7280] dark:text-[#9CA3AF]">Target Store Spec</span>
                   <span className="text-right font-mono-tabular font-bold text-[#0068B5] dark:text-[#38BDF8]">
                     {storeMatch.specSummary}
@@ -184,34 +186,34 @@ export function RetailActionSection({
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-[#E5E7EB] pt-4 dark:border-[#1F2937]">
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#E5E7EB] pt-4 dark:border-[#1F2937]">
               <a
                 href="#pc-builder"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0068B5] underline-offset-4 hover:underline dark:text-[#38BDF8] whitespace-nowrap shrink-0"
+                className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-bold text-[#0068B5] underline-offset-4 hover:underline dark:text-[#38BDF8] whitespace-nowrap shrink-0"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 <span>Adjust Parts Above</span>
               </a>
-              <span aria-hidden="true" className="text-[#CBD5E1] dark:text-[#475569]">
+              <span aria-hidden="true" className="hidden text-[#CBD5E1] dark:text-[#475569] sm:inline">
                 ·
               </span>
               <button
                 type="button"
                 onClick={onLaunchArcade}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#374151] underline-offset-4 hover:text-[#0068B5] hover:underline dark:text-[#D1D5DB] dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
+                className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-bold text-[#374151] underline-offset-4 hover:text-[#0068B5] hover:underline dark:text-[#D1D5DB] dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
               >
                 <Gamepad2 className="h-3.5 w-3.5" />
                 <span>Get Over Here, Byte needs you!</span>
               </button>
               {onAskNova && (
                 <>
-                  <span aria-hidden="true" className="text-[#CBD5E1] dark:text-[#475569]">
+                  <span aria-hidden="true" className="hidden text-[#CBD5E1] dark:text-[#475569] sm:inline">
                     ·
                   </span>
                   <button
                     type="button"
                     onClick={() => onAskNova('Review my current setup and tell me if it fits my needs')}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0068B5] underline-offset-4 hover:underline dark:text-[#38BDF8] whitespace-nowrap shrink-0"
+                    className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-bold text-[#0068B5] underline-offset-4 hover:underline dark:text-[#38BDF8] whitespace-nowrap shrink-0"
                   >
                     <MessageSquareText className="h-3.5 w-3.5" />
                     <span>Ask NOVA Advisor</span>
@@ -222,7 +224,7 @@ export function RetailActionSection({
           </div>
 
           {/* Right Half: Retailer Selector + 4-Item Physical Checklist + One-Click Copy */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-6 transition-colors dark:border-[#1F2937] dark:bg-[#111827] md:p-8 lg:col-span-6">
+          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-4 transition-colors dark:border-[#1F2937] dark:bg-[#111827] sm:p-6 md:p-8 lg:col-span-6">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="font-editorial text-2xl font-bold text-[#111827] dark:text-[#F3F4F6]">
@@ -248,7 +250,7 @@ export function RetailActionSection({
                       role="tab"
                       aria-selected={active}
                       onClick={() => setRetailerId(r.id)}
-                      className={`rounded-md px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                      className={`min-h-[44px] rounded-md px-2 py-2 text-[11px] font-semibold transition-colors sm:px-3 sm:text-xs whitespace-nowrap ${
                         active
                           ? 'bg-white text-[#111827] shadow-xs dark:bg-[#1E293B] dark:text-[#F3F4F6]'
                           : 'text-[#4B5563] hover:text-[#111827] dark:text-[#94A3B8] dark:hover:text-[#F3F4F6]'
@@ -271,7 +273,7 @@ export function RetailActionSection({
                       key={item.id}
                       type="button"
                       onClick={() => toggleCheck(item.id)}
-                      className="flex w-full items-start gap-3 py-3 text-left transition-colors hover:bg-[#FAF8F5] dark:hover:bg-[#0F172A]/70"
+                      className="flex min-h-[52px] w-full items-start gap-3 py-3 text-left transition-colors hover:bg-[#FAF8F5] dark:hover:bg-[#0F172A]/70"
                     >
                       {checked ? (
                         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#059669] dark:text-[#34D399]" />
@@ -312,7 +314,7 @@ export function RetailActionSection({
                 <button
                   type="button"
                   onClick={handleCopyStoreCard}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0068B5] px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-[#005291] whitespace-nowrap shrink-0"
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[#0068B5] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#005291] whitespace-nowrap shrink-0"
                 >
                   {copied ? (
                     <>

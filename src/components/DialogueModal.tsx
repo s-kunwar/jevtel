@@ -130,24 +130,24 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
   };
 
   return (
-    <div className="absolute inset-x-0 bottom-0 z-30 flex justify-center p-3 md:p-5">
-      <div className="ts-wood-panel w-full max-w-4xl">
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/35 p-2.5 sm:inset-x-0 sm:top-auto sm:bottom-0 sm:items-end sm:bg-transparent md:p-5">
+      <div className="ts-wood-panel max-h-[82dvh] w-full max-w-4xl overflow-y-auto">
         {/* Faction Color Ribbon Header */}
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-          <div className={`ts-ribbon ts-ribbon-${ribbonColor} inline-flex items-center gap-2 font-display text-sm font-bold tracking-wide md:text-base`}>
-            <img src={hardwareBadgeUrl} alt="" referrerPolicy="no-referrer" className="pixelated h-5 w-5" />
+          <div className={`ts-ribbon ts-ribbon-${ribbonColor} inline-flex items-center gap-2 font-display text-xs font-bold tracking-wide sm:text-sm md:text-base`}>
+            <img src={hardwareBadgeUrl} alt="" referrerPolicy="no-referrer" className="pixelated h-4 w-4 sm:h-5 sm:w-5" />
             <span>{step.speaker}</span>
           </div>
-          <span className="font-mono-tabular text-xs font-semibold text-[#FDE68A] drop-shadow">
+          <span className="font-mono-tabular text-[11px] font-semibold text-[#FDE68A] drop-shadow sm:text-xs">
             {step.role}
           </span>
         </div>
 
         {/* Parchment Paper Body */}
         <div className="ts-paper-panel">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
             {/* Tiny Swords Avatar / Pixel Trap Laptop Portrait */}
-            <div className="ts-special-panel relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden sm:h-28 sm:w-28">
+            <div className="ts-special-panel relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden sm:h-28 sm:w-28">
               {!imgErr ? (
                 <img
                   src={portraitUrl}
@@ -157,13 +157,13 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
                   className="pixelated h-full w-full object-contain"
                 />
               ) : (
-                <Shield className="h-10 w-10 text-sky-300" />
+                <Shield className="h-8 w-8 text-sky-300 sm:h-10 sm:w-10" />
               )}
             </div>
 
             {/* Parchment Dialogue Copy + Choices */}
             <div className="min-w-0 flex-1">
-              <p className="min-h-[3.5rem] text-sm font-medium leading-relaxed text-[#2B1B12] md:text-base">
+              <p className="min-h-[2.75rem] text-xs font-medium leading-relaxed text-[#2B1B12] sm:min-h-[3.5rem] sm:text-sm md:text-base">
                 {currentSentence.slice(0, visibleChars)}
               </p>
 
@@ -174,9 +174,9 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
                       key={choice.label}
                       type="button"
                       onClick={() => onSelectChoice(choice)}
-                      className="ts-btn-blue flex w-full items-center gap-3 text-left font-display text-sm font-bold text-white"
+                      className="ts-btn-blue flex min-h-[44px] w-full items-center gap-3 text-left font-display text-xs font-bold text-white sm:text-sm"
                     >
-                      <kbd className="shrink-0 rounded bg-[#153c44] px-2 py-0.5 font-mono-tabular text-xs font-bold text-[#FDE68A]">
+                      <kbd className="hidden shrink-0 rounded bg-[#153c44] px-2 py-0.5 font-mono-tabular text-xs font-bold text-[#FDE68A] sm:inline-block">
                         {idx + 1}
                       </kbd>
                       <span>{choice.label}</span>
@@ -185,13 +185,13 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
                 </div>
               ) : (
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <span className="font-mono-tabular text-xs font-semibold text-[#6E492D]">
+                  <span className="font-mono-tabular text-[11px] font-semibold text-[#6E492D] sm:text-xs">
                     {sentences.length > 1 ? `Sentence ${sentenceIndex + 1} / ${sentences.length}` : ''}
                   </span>
                   <button
                     type="button"
                     onClick={handlePrimaryClick}
-                    className="ts-btn-blue inline-flex items-center gap-2 font-display text-xs font-bold text-white whitespace-nowrap shrink-0"
+                    className="ts-btn-blue inline-flex min-h-[44px] items-center gap-2 font-display text-xs font-bold text-white sm:min-h-0 whitespace-nowrap shrink-0"
                   >
                     <img
                       src={TINY_SWORDS_UI.icons.play}
@@ -200,7 +200,7 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
                       className="pixelated h-4 w-4"
                     />
                     <span>{!isTypingDone ? 'Skip' : !isLastSentence ? 'Next' : 'Continue'}</span>
-                    <kbd className="font-mono-tabular text-[11px] text-[#FDE68A]">[E]</kbd>
+                    <kbd className="hidden font-mono-tabular text-[11px] text-[#FDE68A] sm:inline">[E]</kbd>
                   </button>
                 </div>
               )}

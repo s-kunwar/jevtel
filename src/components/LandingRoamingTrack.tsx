@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { getPreloadedOrLoadImage } from '../game/assets';
 
 export type RoamingTrackVariant = 'heroes' | 'sheep' | 'boss';
 
@@ -119,20 +120,8 @@ const TRACK_CONFIGS: Record<RoamingTrackVariant, RoamingActorConfig[]> = {
   ],
 };
 
-const spriteImageCache = new Map<string, HTMLImageElement>();
-
 function loadCachedSprite(url: string): Promise<HTMLImageElement> {
-  const cached = spriteImageCache.get(url);
-  if (cached) return Promise.resolve(cached);
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      spriteImageCache.set(url, img);
-      resolve(img);
-    };
-    img.onerror = () => resolve(img);
-    img.src = url;
-  });
+  return getPreloadedOrLoadImage(url);
 }
 
 export function LandingRoamingTrack({ variant }: LandingRoamingTrackProps) {
@@ -220,20 +209,21 @@ export function LandingRoamingTrack({ variant }: LandingRoamingTrackProps) {
         const frameIdx = reducedMotion ? 0 : Math.floor(elapsed * a.cfg.fps) % totalFrames;
 
         const px = Math.round(a.pct * w);
+        const mobileScale = w < 520 ? 0.72 : 1;
+        const s = Math.round(a.cfg.sizePx * mobileScale);
 
         // Grounded soft ellipse contact shadow on the blueprint trace line
         ctx.save();
         ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
         ctx.beginPath();
-        ctx.ellipse(px, groundY, Math.round(a.cfg.sizePx * 0.22), 3.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(px, groundY, Math.round(s * 0.22), 3.0, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        ctx.translate(px, groundY + a.cfg.yBaselineOffset);
+        ctx.translate(px, groundY + Math.round(a.cfg.yBaselineOffset * mobileScale));
         if (a.dir < 0) ctx.scale(-1, 1);
-        const s = a.cfg.sizePx;
         ctx.drawImage(sheet, frameIdx * fh, 0, fh, fh, -Math.round(s / 2), -s, s, s);
         ctx.restore();
       }
@@ -292,7 +282,7 @@ export function LandingRoamingTrack({ variant }: LandingRoamingTrackProps) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-6 bottom-[6px] h-[56px] select-none md:inset-x-10"
+      className="pointer-events-none absolute inset-x-3 bottom-[4px] h-[44px] select-none sm:inset-x-6 sm:bottom-[6px] sm:h-[56px] md:inset-x-10"
     >
       <canvas ref={canvasRef} className="block h-full w-full" />
     </div>

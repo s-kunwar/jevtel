@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -13,6 +13,9 @@ import {
   type LiveServerMessage,
 } from '@google/genai';
 
+dotenv.config({ path: '.env.local' });
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -24,7 +27,22 @@ interface ChatMessageInput {
   text: string;
 }
 
+interface FastModeProfileInput {
+  primaryLife?: string;
+  secondaryLife?: string;
+  priorities?: string[];
+  budgetLabel?: string;
+  storeFilter?: string;
+  matchedModel?: string;
+  matchedSku?: string;
+  matchedRetailer?: string;
+  matchedPrice?: string;
+  stretchModel?: string;
+  activeShowdownRound?: string;
+}
+
 interface KioskContextInput {
+  appMode?: 'fast' | 'pro';
   hasCompletedQuest?: boolean;
   matchSource?: 'builder' | 'quest';
   processorLabel?: string;
@@ -33,7 +51,18 @@ interface KioskContextInput {
   storageLabel?: string;
   scenarioLabel?: string;
   matchedTierName?: string;
+  fastModeProfile?: FastModeProfileInput;
 }
+
+const FAST_MODE_NOVA_SYSTEM_INSTRUCTION = `You are NOVA, a friendly, honest shopping friend helping everyday non-technical walk-in shoppers at Croma, Reliance Digital, and Vijay Sales in India.
+
+Your Persona ("Plain-English Friend"):
+- Speak warmly and clearly in plain everyday English—ZERO tech jargon. Do not throw around terms like TOPS, NPU architectures, TDP, emulation layers, or clock speeds unless translating them into simple everyday analogies (e.g., "Think of the built-in AI helper like a quiet side-kick that blurs your Zoom background so the main engine stays cool and saves battery").
+- Keep EVERY reply to strictly 2 to 3 short sentences (under 65 words total). Be scannable, calm, and helpful.
+- Only talk about Intel Core Ultra Series 1 and Series 2 laptops with Intel Arc graphics available at Croma, Reliance Digital, and Vijay Sales. NEVER mention Intel Core Ultra Series 3, Arc B390, or Amazon India.
+- Never bash competing brands by name; explain the difference simply: 4+ years of smooth speed, native support for Tally/Adobe/college Windows apps, 100% offline privacy on trains/hostels, and not needing to replace a ₹55k bargain laptop after 18 months.
+- When helpful, end with a short practical "Show to Store Staff" tip referencing their matched model or checking the Core Ultra sticker + 16GB RAM in Settings.
+- Stay strictly on helping them choose the right everyday laptop.`;
 
 const BASE_NOVA_SYSTEM_INSTRUCTION = `You are NOVA, an interactive Retail PC Advisor built into an arcade kiosk experience for walk-in Gen-Z shoppers at Reliance Digital, Croma, and Vijay Sales.
 
@@ -61,8 +90,44 @@ Strict Guardrails:
 function buildSystemInstruction(context?: KioskContextInput): string {
   if (!context) return BASE_NOVA_SYSTEM_INSTRUCTION;
 
-  const clean = (val: unknown, max = 80): string =>
+  const clean = (val: unknown, max = 100): string =>
     typeof val === 'string' ? val.replace(/[\r\n]+/g, ' ').trim().slice(0, max) : '';
+
+  if (context.appMode === 'fast') {
+    const fp = context.fastModeProfile;
+    const notes: string[] = [];
+    if (fp) {
+      const life = clean(fp.primaryLife);
+      const sec = clean(fp.secondaryLife);
+      if (life) notes.push(`Shopper daily life: ${life}${sec ? ` + ${sec}` : ''}.`);
+      if (Array.isArray(fp.priorities) && fp.priorities.length > 0) {
+        notes.push(
+          `Shopper priorities: ${fp.priorities.map((p) => clean(p, 50)).filter(Boolean).join(', ')}.`
+        );
+      }
+      const budget = clean(fp.budgetLabel);
+      if (budget) notes.push(`Budget bracket: ${budget}.`);
+      const matched = clean(fp.matchedModel);
+      const store = clean(fp.matchedRetailer);
+      const price = clean(fp.matchedPrice);
+      const sku = clean(fp.matchedSku);
+      if (matched) {
+        notes.push(
+          `Current matched laptop: ${matched} (${price || 'in budget'} at ${store || 'LFR store'}${sku ? `, SKU ${sku}` : ''}).`
+        );
+      }
+      const stretch = clean(fp.stretchModel);
+      if (stretch) notes.push(`Optional stretch pick: ${stretch}.`);
+      const round = clean(fp.activeShowdownRound);
+      if (round) notes.push(`Currently viewing Showdown moment: ${round}.`);
+    }
+
+    if (notes.length === 0) return FAST_MODE_NOVA_SYSTEM_INSTRUCTION;
+    return `${FAST_MODE_NOVA_SYSTEM_INSTRUCTION}
+
+Shopper's Live Fast Mode Picks (reference naturally without repeating specs robotically):
+- ${notes.join('\n- ')}`;
+  }
 
   const notes: string[] = [];
   if (context.hasCompletedQuest) {
@@ -126,11 +191,20 @@ Recent Chat History Before Switching to Voice:
 ${cleanHistory.join('\n')}`;
 }
 
+function getConfiguredGeminiApiKey(): string {
+  const raw =
+    process.env.GEMINI_API_KEY ||
+    process.env.API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    '';
+  return raw.trim();
+}
+
 function getAiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getConfiguredGeminiApiKey();
   if (!apiKey) {
     throw Object.assign(
-      new Error('Gemini API key is missing. Please add GEMINI_API_KEY in Settings > Secrets.'),
+      new Error('Gemini API key is missing on the server. Set GEMINI_API_KEY in Settings > Secrets or your host environment.'),
       { statusCode: 500 }
     );
   }
@@ -202,6 +276,10 @@ async function sendWithRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
+
+  app.get('/api/nova/status', (_req: Request, res: Response) => {
+    res.json({ ready: Boolean(getConfiguredGeminiApiKey()) });
+  });
 
   app.post('/api/nova/chat', async (req: Request, res: Response) => {
     try {

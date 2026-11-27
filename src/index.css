@@ -8,6 +8,8 @@
     --font-hand-body: "Kalam", cursive;
     --font-display: "Chakra Petch", sans-serif;
     --font-sans: "Plus Jakarta Sans", sans-serif;
+    --font-fast-display: "Manrope", sans-serif;
+    --font-fast-body: "Figtree", sans-serif;
     --font-mono: "JetBrains Mono", monospace;
     --ts-cursor-default: auto;
     --ts-cursor-pointer: pointer;
@@ -57,6 +59,23 @@
 
 .font-hand-body {
   font-family: var(--font-hand-body);
+}
+
+.font-fast-display {
+  font-family: var(--font-fast-display);
+}
+
+.font-fast-body {
+  font-family: var(--font-fast-body);
+}
+
+.fast-mode-canvas {
+  font-family: var(--font-fast-body);
+  background-color: #f7f9f9;
+}
+
+.dark .fast-mode-canvas {
+  background-color: #0b1318;
 }
 
 .landing-sketch-root {
@@ -462,3 +481,43 @@
     animation: none;
   }
 }
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.safe-pb {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.safe-pt {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+@media (max-width: 639px) {
+  .ts-wood-panel {
+    border-width: 11px 11px 13px 11px;
+  }
+  .ts-wood-compact {
+    border-width: 8px 9px 10px 9px;
+  }
+  .ts-paper-panel {
+    border-width: 10px 11px 10px 11px;
+  }
+  .ts-special-panel {
+    border-width: 10px 11px 10px 11px;
+  }
+  .ts-btn-blue,
+  .ts-btn-red {
+    border-width: 8px 11px 10px 11px;
+    min-height: 44px;
+  }
+  .ts-ribbon {
+    border-width: 5px 22px 6px 22px;
+  }
+}
+
