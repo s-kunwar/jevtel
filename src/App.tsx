@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { AnimatePresence, MotionConfig } from 'motion/react';
 import { AiPcForgeSection } from './components/AiPcForgeSection';
 import { ArcadeCabinetModal } from './components/ArcadeCabinetModal';
@@ -10,7 +11,10 @@ import { HeroGateway } from './components/HeroGateway';
 import { IntroPreloader } from './components/IntroPreloader';
 import { LandingHeader } from './components/LandingHeader';
 import { PauseModal } from './components/PauseModal';
+import { NovaAdvisorChat, type NovaKioskContext } from './components/NovaAdvisorChat';
+import { PreferenceProductsSection } from './components/PreferenceProductsSection';
 import { RetailActionSection } from './components/RetailActionSection';
+import { IntelBlueprintDivider, IntelMarginSeal } from './components/SketchDoodles';
 import { TitleScreen } from './components/TitleScreen';
 import { VictorySummary } from './components/VictorySummary';
 import { initTinySwordsUiSkins } from './game/assets';
@@ -18,11 +22,16 @@ import { gameAudio } from './game/audio';
 import { INTEL_HARDWARE_SPECS } from './game/intelHardwareData';
 import {
   DEFAULT_BUILDER_CONFIG,
+  GRAPHICS_OPTIONS,
+  MEMORY_OPTIONS,
+  PROCESSOR_OPTIONS,
+  STORAGE_OPTIONS,
+  WORKLOAD_SCENARIOS,
   mapQuestPcToBuilderConfig,
   type PcBuilderConfig,
   type WorkloadScenarioId,
 } from './game/pcBuilderData';
-import { STORY_DIALOGUES } from './game/storyData';
+import { computeRecommendation, STORY_DIALOGUES } from './game/storyData';
 import type {
   CatalogPcCharacter,
   DialogueChoice,
@@ -84,6 +93,14 @@ export default function App() {
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [finalProfile, setFinalProfile] = useState<PlayerProfile | null>(null);
   const [muted, setMuted] = useState(false);
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('jevtel_theme') === 'dark';
+    } catch {
+      return false;
+    }
+  });
   const [introDone, setIntroDone] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -95,6 +112,9 @@ export default function App() {
   const [matchSource, setMatchSource] = useState<'builder' | 'quest'>('builder');
   const [questMatchedPcId, setQuestMatchedPcId] = useState<string | undefined>(undefined);
   const [hasCompletedQuest, setHasCompletedQuest] = useState(false);
+  const [novaOpen, setNovaOpen] = useState(false);
+  const [novaSessionNonce, setNovaSessionNonce] = useState(0);
+  const [novaQueuedPrompt, setNovaQueuedPrompt] = useState<{ id: number; text: string } | null>(null);
 
   const phaseRef = useRef<GamePhase>('TITLE');
   phaseRef.current = phase;
@@ -102,6 +122,19 @@ export default function App() {
   inExpoRef.current = hud.inExpoPark;
   const arcadeOpenRef = useRef(false);
   arcadeOpenRef.current = arcadeOpen;
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    try {
+      window.localStorage.setItem('jevtel_theme', darkMode ? 'dark' : 'light');
+    } catch {
+      // ignore storage failure
+    }
+  }, [darkMode]);
+
+  const handleToggleDarkMode = useCallback(() => {
+    setDarkMode((prev) => !prev);
+  }, []);
 
   const handleToggleMute = useCallback(() => {
     gameAudio.init();
@@ -244,6 +277,9 @@ export default function App() {
     setMatchSource('builder');
     setQuestMatchedPcId(undefined);
     setHasCompletedQuest(false);
+    setNovaOpen(false);
+    setNovaQueuedPrompt(null);
+    setNovaSessionNonce((n) => n + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
@@ -358,6 +394,25 @@ export default function App() {
     []
   );
 
+  const handleOpenNova = useCallback((promptText?: string) => {
+    setNovaOpen(true);
+    if (promptText && promptText.trim()) {
+      setNovaQueuedPrompt({ id: Date.now(), text: promptText.trim() });
+    }
+  }, []);
+
+  const handleAskNovaFromQuest = useCallback(
+    (profile: PlayerProfile, matchedPcId: string) => {
+      handleSendQuestMatchToStore(profile, matchedPcId);
+      setNovaOpen(true);
+      setNovaQueuedPrompt({
+        id: Date.now(),
+        text: 'I just finished the Silicon Quest arcade game! Can you help me pick the right Core Ultra tier for my budget and use case?',
+      });
+    },
+    [handleSendQuestMatchToStore]
+  );
+
   const currentDialogue = dialogueId ? STORY_DIALOGUES[dialogueId] : null;
   const effectiveProfile: PlayerProfile = finalProfile ?? {
     primaryNeed: 'learning',
@@ -373,9 +428,29 @@ export default function App() {
     elapsedSeconds: 120,
   };
 
+  const questRec = hasCompletedQuest
+    ? computeRecommendation(effectiveProfile, questMatchedPcId ?? hud.matchedPcId)
+    : null;
+
+  const novaKioskContext: NovaKioskContext = {
+    hasCompletedQuest,
+    matchSource,
+    processorLabel:
+      PROCESSOR_OPTIONS.find((p) => p.id === builderConfig.processor)?.label ?? '',
+    graphicsLabel:
+      GRAPHICS_OPTIONS.find((g) => g.id === builderConfig.graphics)?.label ?? '',
+    memoryLabel:
+      MEMORY_OPTIONS.find((m) => m.id === builderConfig.memory)?.label ?? '',
+    storageLabel:
+      STORAGE_OPTIONS.find((s) => s.id === builderConfig.storage)?.label ?? '',
+    scenarioLabel:
+      WORKLOAD_SCENARIOS.find((s) => s.id === workloadScenario)?.label ?? '',
+    matchedTierName: questRec?.tierName ?? '',
+  };
+
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-screen bg-[#FAF8F5] text-[#111827]">
+      <div className="min-h-screen bg-[#FAF8F5] text-[#111827] transition-colors duration-200 dark:bg-[#0B1120] dark:text-[#F3F4F6]">
         <AnimatePresence>
           {!introDone && (
             <IntroPreloader
@@ -388,8 +463,19 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <div className="landing-sketch-root">
-          <LandingHeader onPlayQuest={handleLaunchArcade} />
+        <div className="landing-sketch-root relative overflow-x-clip">
+          {/* Subtle architectural Intel silicon seal watermark in quiet outer whitespace margins */}
+          <IntelMarginSeal className="fixed right-[-44px] top-28 z-0 hidden h-52 w-52 2xl:block" />
+          <IntelMarginSeal className="fixed bottom-12 left-[-48px] z-0 hidden h-56 w-56 2xl:block" />
+
+          <LandingHeader
+            onPlayQuest={handleLaunchArcade}
+            onOpenNova={() => handleOpenNova()}
+            darkMode={darkMode}
+            onToggleDarkMode={handleToggleDarkMode}
+            muted={muted}
+            onToggleMute={handleToggleMute}
+          />
 
           <main>
             <HeroGateway
@@ -397,27 +483,63 @@ export default function App() {
               hasCompletedQuest={hasCompletedQuest}
               introReady={introDone}
               arcadeOpen={arcadeOpen}
+              darkMode={darkMode}
+              globalMuted={muted}
+              onToggleGlobalMute={handleToggleMute}
             />
-          <AiPcForgeSection
-            config={builderConfig}
-            onChangeConfig={(next) => {
-              setBuilderConfig(next);
-              setMatchSource('builder');
-            }}
-            scenario={workloadScenario}
-            onChangeScenario={setWorkloadScenario}
-            xessEnabled={xessEnabled}
-            onToggleXess={() => setXessEnabled((prev) => !prev)}
-          />
-          <RetailActionSection
-            builderConfig={builderConfig}
-            matchSource={matchSource}
-            questMatchedPcId={questMatchedPcId}
-            onLaunchArcade={handleLaunchArcade}
-            onResetSession={handleResetSession}
-          />
-        </main>
-      </div>
+            <IntelBlueprintDivider label="01 · ARCHITECTURE & BENCHMARK" roamingVariant="heroes" />
+            <AiPcForgeSection
+              config={builderConfig}
+              onChangeConfig={(next) => {
+                setBuilderConfig(next);
+                setMatchSource('builder');
+              }}
+              scenario={workloadScenario}
+              onChangeScenario={setWorkloadScenario}
+              xessEnabled={xessEnabled}
+              onToggleXess={() => setXessEnabled((prev) => !prev)}
+            />
+            <IntelBlueprintDivider label="02 · RETAIL VERIFICATION" roamingVariant="sheep" />
+            <RetailActionSection
+              builderConfig={builderConfig}
+              matchSource={matchSource}
+              questMatchedPcId={questMatchedPcId}
+              onLaunchArcade={handleLaunchArcade}
+              onAskNova={(prompt) => handleOpenNova(prompt)}
+            />
+            <IntelBlueprintDivider label="03 · CURATED STORE CATALOG" roamingVariant="boss" />
+            <PreferenceProductsSection
+              builderConfig={builderConfig}
+              scenario={workloadScenario}
+              matchSource={matchSource}
+              questMatchedPcId={questMatchedPcId}
+              onApplyProductToBuilder={(next) => {
+                setBuilderConfig(next);
+                setMatchSource('builder');
+              }}
+            />
+          </main>
+
+          {/* Quiet Footer + Kiosk Reset Safeguard */}
+          <footer className="border-t border-[#E5E7EB] bg-[#FAF8F5] py-8 transition-colors duration-200 dark:border-[#1F2937] dark:bg-[#0B1120]">
+            <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-4 px-5 text-xs text-[#6B7280] dark:text-[#9CA3AF] sm:flex-row sm:items-center md:px-10">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-[#111827] dark:text-[#F3F4F6]">Jevtel</span>
+                <span aria-hidden="true">·</span>
+                <span>Amazon India · Croma · Vijay Sales · Reliance Digital Store Guide</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetSession}
+                className="inline-flex items-center gap-1.5 font-medium text-[#4B5563] transition-colors hover:text-[#111827] dark:text-[#9CA3AF] dark:hover:text-[#F3F4F6] whitespace-nowrap shrink-0"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Session</span>
+              </button>
+            </div>
+          </footer>
+        </div>
 
       {/* Expanding Full-Screen Intel Core Ultra Arcade Machine */}
       <ArcadeCabinetModal
@@ -452,6 +574,7 @@ export default function App() {
             muted={muted}
             onToggleMute={handleToggleMute}
             onPause={handleTogglePause}
+            onExitArcade={handleExitArcade}
             onOpenStoreModal={() => setShowStoreModal(true)}
           />
         )}
@@ -506,9 +629,19 @@ export default function App() {
             onCloseModal={() => setShowStoreModal(false)}
             onPlayAgain={handleStartGame}
             onSendToLandingChecklist={handleSendQuestMatchToStore}
+            onAskNovaFromQuest={handleAskNovaFromQuest}
           />
         )}
       </ArcadeCabinetModal>
+
+      <NovaAdvisorChat
+        open={novaOpen}
+        onOpenChange={setNovaOpen}
+        arcadeOpen={arcadeOpen}
+        sessionNonce={novaSessionNonce}
+        queuedPrompt={novaQueuedPrompt}
+        kioskContext={novaKioskContext}
+      />
       </div>
     </MotionConfig>
   );

@@ -1,6 +1,6 @@
 {
   "name": "Silicon Quest: Core Ultra",
   "description": "A top-down isometric pixel-art action-RPG set inside an Intel Core Ultra AI PC chip. Experience why cheap flashy laptops lag, master NPU and Arc XeSS powers, defeat the Lag Titan, and get a personalized Intel AI PC match.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

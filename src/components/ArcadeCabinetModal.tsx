@@ -10,7 +10,6 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import { ARCADE_CABINET_ART_URLS, INTEL_HARDWARE_URLS } from '../game/assets';
 import { gameAudio } from '../game/audio';
 import type { IntelHardwareKey } from '../game/types';
 
@@ -82,7 +81,6 @@ export function ArcadeCabinetModal({
     };
   }, [open]);
 
-  // Compute live joystick tilt from keyboard OR on-screen D-pad touch
   let jx = pointerDir.x;
   let jy = pointerDir.y;
   if (heldCodes.has('KeyA') || heldCodes.has('ArrowLeft')) jx -= 1;
@@ -130,49 +128,31 @@ export function ArcadeCabinetModal({
       aria-label="Jevtel Arcade Quest"
       className={
         open
-          ? 'fixed inset-0 z-50 flex items-center justify-center bg-[#111827]/45 p-1.5 backdrop-blur-xs sm:p-3'
+          ? 'fixed inset-0 z-50 flex items-center justify-center bg-[#060B16]/82 p-1 sm:p-2'
           : 'pointer-events-none fixed -left-[9999px] top-0 h-[720px] w-[1280px] opacity-0'
       }
     >
-      {/* Nearly Full-Screen Warm Parchment Cabinet with Crisp Ink Borders & Cobalt Blue Accents */}
+      {/* Minimal Distraction-Free Game Frame */}
       <div
         className={`${
           open ? 'animate-arcade-expand' : ''
-        } relative flex h-[95vh] max-h-[980px] w-[97vw] max-w-[1560px] flex-col overflow-hidden rounded-2xl border-2 border-[#111827] bg-[#FAF8F5] text-[#111827] shadow-[8px_8px_0px_#111827]`}
+        } relative flex h-[96vh] max-h-[1020px] w-[98vw] max-w-[1640px] flex-col overflow-hidden rounded-xl border border-[#1E293B] bg-[#0B1220] text-[#F8FAFC] shadow-2xl`}
       >
-        {/* SLIM TOP HEADER WITH CUSTOM PARCHMENT MARQUEE ART */}
-        <div className="relative flex shrink-0 items-center justify-between gap-3 border-b-2 border-[#111827] bg-white px-3 py-2 sm:px-4">
-          {/* Custom Hand-Drawn Parchment Marquee Strip */}
-          <div className="relative flex h-10 min-w-0 flex-1 items-center overflow-hidden rounded-lg border-2 border-[#111827] bg-[#FAF8F5] sm:h-11">
-            <img
-              src={ARCADE_CABINET_ART_URLS.marquee}
-              alt="Hand-drawn parchment illustration of Silicon City"
-              referrerPolicy="no-referrer"
-              className="h-full w-full object-cover opacity-85"
-            />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#FAF8F5]/95 via-[#FAF8F5]/65 to-[#FAF8F5]/30" />
-            <div className="relative z-10 flex items-center gap-2.5 px-3">
-              <img
-                src={INTEL_HARDWARE_URLS.chip}
-                alt="Intel Core Ultra"
-                referrerPolicy="no-referrer"
-                className="pixelated h-7 w-7 shrink-0 rounded border border-[#111827]/20 bg-white p-0.5"
-              />
-              <div className="min-w-0">
-                <div className="truncate font-editorial text-sm font-bold text-[#111827] sm:text-base">
-                  Jevtel · Byte vs. The Lag Titan
-                </div>
-              </div>
-            </div>
+        {/* Minimal Slim Perimeter Bar */}
+        <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-[#1E293B] bg-[#0F172A] px-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-xs bg-[#00C7FD]" />
+            <span className="truncate font-display text-xs font-bold tracking-wider text-[#F8FAFC] uppercase sm:text-sm">
+              Silicon Quest · Core Ultra
+            </span>
           </div>
 
-          {/* Slim Perimeter Controls */}
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={onToggleMute}
               title={muted ? 'Unmute Audio [M]' : 'Mute Audio [M]'}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#CBD5E1] bg-[#FAF8F5] px-2.5 text-xs font-bold text-[#111827] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] whitespace-nowrap shrink-0"
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[#334155] bg-[#1E293B] px-2.5 text-xs font-semibold text-[#E2E8F0] transition-colors hover:border-[#00C7FD] hover:text-white whitespace-nowrap shrink-0"
             >
               {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{muted ? 'Muted' : 'Audio'}</span>
@@ -182,7 +162,7 @@ export function ArcadeCabinetModal({
               type="button"
               onClick={onResetQuest}
               title="Restart Quest"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#CBD5E1] bg-[#FAF8F5] px-2.5 text-xs font-bold text-[#111827] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] whitespace-nowrap shrink-0"
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[#334155] bg-[#1E293B] px-2.5 text-xs font-semibold text-[#E2E8F0] transition-colors hover:border-[#00C7FD] hover:text-white whitespace-nowrap shrink-0"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Restart</span>
@@ -192,7 +172,7 @@ export function ArcadeCabinetModal({
               type="button"
               onClick={onJumpToChecklist}
               title="Find Your Match"
-              className="hidden h-9 items-center gap-1.5 rounded-lg border border-[#CBD5E1] bg-[#FAF8F5] px-2.5 text-xs font-bold text-[#111827] transition-colors hover:border-[#0068B5] hover:text-[#0068B5] sm:inline-flex whitespace-nowrap shrink-0"
+              className="hidden h-7 items-center gap-1.5 rounded-md border border-[#334155] bg-[#1E293B] px-2.5 text-xs font-semibold text-[#E2E8F0] transition-colors hover:border-[#00C7FD] hover:text-white sm:inline-flex whitespace-nowrap shrink-0"
             >
               <Store className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Store Match</span>
@@ -202,34 +182,31 @@ export function ArcadeCabinetModal({
               type="button"
               onClick={onExitArcade}
               title="Close Game"
-              className="inline-flex h-9 items-center gap-1 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-3 text-xs font-bold text-white transition-colors hover:bg-[#005291] whitespace-nowrap shrink-0"
+              className="inline-flex h-7 items-center gap-1 rounded-md bg-[#DC2626] px-3 text-xs font-extrabold text-white transition-colors hover:bg-[#B91C1C] whitespace-nowrap shrink-0"
             >
-              <X className="h-4 w-4" />
-              <span>Close</span>
+              <X className="h-3.5 w-3.5" />
+              <span>Exit Game</span>
             </button>
           </div>
         </div>
 
-        {/* FULL-WIDTH GAME VIEWPORT */}
-        <div className="min-h-0 flex-1 bg-[#FAF8F5] p-1.5 sm:p-2.5">
-          <div className="relative h-full w-full overflow-hidden rounded-xl border-2 border-[#111827] bg-[#0B1524]">
-            {children}
-          </div>
+        {/* Full-Focus Game Viewport */}
+        <div className="relative min-h-0 flex-1 bg-[#0B1524]">
+          {children}
         </div>
 
-        {/* SLIM WARM PARCHMENT CONTROL BAR */}
-        <div className="shrink-0 border-t-2 border-[#111827] bg-white px-3 py-1.5 sm:px-5 sm:py-2">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            {/* LEFT: Reactive Ink/Cobalt Joystick + Touch D-Pad */}
-            <div className="flex items-center gap-2.5">
+        {/* Compact Touch / Key Controls Footer */}
+        <div className="shrink-0 border-t border-[#1E293B] bg-[#0F172A] px-3 py-1.5 sm:px-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
               <div
                 aria-hidden="true"
-                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[#111827] bg-[#FAF8F5]"
+                className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#334155] bg-[#0B1220]"
               >
                 <div
-                  className="h-5 w-5 rounded-full border-2 border-[#111827] bg-[#0068B5] transition-transform duration-75"
+                  className="h-3.5 w-3.5 rounded-full bg-[#0068B5] transition-transform duration-75"
                   style={{
-                    transform: `translate(${jx * 6}px, ${jy * 6}px)`,
+                    transform: `translate(${jx * 4}px, ${jy * 4}px)`,
                   }}
                 />
               </div>
@@ -242,9 +219,9 @@ export function ArcadeCabinetModal({
                   onPointerUp={() => handleTouchMove(0, 0)}
                   onPointerLeave={() => handleTouchMove(0, 0)}
                   onPointerCancel={() => handleTouchMove(0, 0)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#CBD5E1] bg-[#FAF8F5] text-[#111827] active:bg-[#0068B5] active:text-white"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#334155] bg-[#1E293B] text-[#E2E8F0] active:bg-[#0068B5]"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <ArrowLeft className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
@@ -253,9 +230,9 @@ export function ArcadeCabinetModal({
                   onPointerUp={() => handleTouchMove(0, 0)}
                   onPointerLeave={() => handleTouchMove(0, 0)}
                   onPointerCancel={() => handleTouchMove(0, 0)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#CBD5E1] bg-[#FAF8F5] text-[#111827] active:bg-[#0068B5] active:text-white"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#334155] bg-[#1E293B] text-[#E2E8F0] active:bg-[#0068B5]"
                 >
-                  <ArrowUp className="h-3.5 w-3.5" />
+                  <ArrowUp className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
@@ -264,9 +241,9 @@ export function ArcadeCabinetModal({
                   onPointerUp={() => handleTouchMove(0, 0)}
                   onPointerLeave={() => handleTouchMove(0, 0)}
                   onPointerCancel={() => handleTouchMove(0, 0)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#CBD5E1] bg-[#FAF8F5] text-[#111827] active:bg-[#0068B5] active:text-white"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#334155] bg-[#1E293B] text-[#E2E8F0] active:bg-[#0068B5]"
                 >
-                  <ArrowDown className="h-3.5 w-3.5" />
+                  <ArrowDown className="h-3 w-3" />
                 </button>
                 <button
                   type="button"
@@ -275,69 +252,67 @@ export function ArcadeCabinetModal({
                   onPointerUp={() => handleTouchMove(0, 0)}
                   onPointerLeave={() => handleTouchMove(0, 0)}
                   onPointerCancel={() => handleTouchMove(0, 0)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#CBD5E1] bg-[#FAF8F5] text-[#111827] active:bg-[#0068B5] active:text-white"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#334155] bg-[#1E293B] text-[#E2E8F0] active:bg-[#0068B5]"
                 >
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3 w-3" />
                 </button>
               </div>
             </div>
 
-            {/* CENTER: Quiet Movement Guide */}
-            <div className="hidden text-xs font-medium text-[#4B5563] md:block">
-              Move with WASD or Arrow Keys · Press Esc to Pause
+            <div className="hidden font-mono-tabular text-[11px] text-[#94A3B8] md:block">
+              WASD / Arrows: Move · Esc: Pause
             </div>
 
-            {/* RIGHT: Compact Ink-Bordered Action Buttons */}
-            <div className="flex items-center gap-2 touch-none sm:gap-2.5">
+            <div className="flex items-center gap-1.5 touch-none">
               <button
                 type="button"
                 onClick={() => handleArcadeButton('attack')}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border-2 border-[#111827] px-3 text-xs font-bold transition-transform duration-75 ${
+                className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                   attackPressed
-                    ? 'translate-y-0.5 bg-[#005291] text-white'
-                    : 'bg-[#0068B5] text-white shadow-[2px_2px_0px_#111827]'
+                    ? 'border-[#00C7FD] bg-[#005291] text-white'
+                    : 'border-[#0068B5] bg-[#0068B5]/90 text-white hover:bg-[#0068B5]'
                 }`}
               >
-                <span className="font-mono-tabular">O</span>
+                <span className="font-mono-tabular text-[#BAE6FD]">O</span>
                 <span>Attack</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleArcadeButton('special')}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border-2 border-[#111827] px-3 text-xs font-bold transition-transform duration-75 ${
+                className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                   specialPressed
-                    ? 'translate-y-0.5 bg-[#D97706] text-white'
-                    : 'bg-[#FEF3C7] text-[#111827] shadow-[2px_2px_0px_#111827]'
+                    ? 'border-[#38BDF8] bg-[#0284C7] text-white'
+                    : 'border-[#334155] bg-[#1E293B] text-[#E2E8F0] hover:border-[#00C7FD]'
                 }`}
               >
-                <span className="font-mono-tabular">P</span>
+                <span className="font-mono-tabular text-[#38BDF8]">P</span>
                 <span>Boost</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleArcadeButton('dash')}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border-2 border-[#111827] px-3 text-xs font-bold transition-transform duration-75 ${
+                className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                   dashPressed
-                    ? 'translate-y-0.5 bg-[#059669] text-white'
-                    : 'bg-[#ECFDF5] text-[#111827] shadow-[2px_2px_0px_#111827]'
+                    ? 'border-[#34D399] bg-[#059669] text-white'
+                    : 'border-[#334155] bg-[#1E293B] text-[#E2E8F0] hover:border-[#34D399]'
                 }`}
               >
-                <span className="font-mono-tabular">Space</span>
+                <span className="font-mono-tabular text-[#6EE7B7]">Space</span>
                 <span className="hidden sm:inline">Dash</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleArcadeButton('interact')}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border-2 border-[#111827] px-3 text-xs font-bold transition-transform duration-75 ${
+                className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                   interactPressed
-                    ? 'translate-y-0.5 bg-[#111827] text-white'
-                    : 'bg-white text-[#111827] shadow-[2px_2px_0px_#111827]'
+                    ? 'border-[#F8FAFC] bg-[#334155] text-white'
+                    : 'border-[#334155] bg-[#1E293B] text-[#E2E8F0] hover:border-[#94A3B8]'
                 }`}
               >
-                <span className="font-mono-tabular">E</span>
+                <span className="font-mono-tabular text-[#CBD5E1]">E</span>
                 <span>Talk</span>
               </button>
             </div>

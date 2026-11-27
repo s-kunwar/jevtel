@@ -6,15 +6,16 @@ import type {
   StoreStation,
 } from './types';
 
+// Compact 28x22 Intel Festival Courtyard coordinates — all 5 pavilions visible within steps of the center Wafer Stage
 export const EXPO_PC_CATALOG: CatalogPcCharacter[] = [
   {
     id: 'pc_campus_dash',
     name: 'Campus Dash · Ultra 5',
     tierName: 'Intel Core Ultra 5 AI PC',
-    persona: 'The All-Day Study Buddy',
-    tagline: '20+ hour campus battery + instant offline lecture & PDF AI on the NPU.',
-    wx: 9,
-    wy: 10,
+    persona: 'The Early-Train Scholar',
+    tagline: '20+ hour unplugged battery and silent offline notes so morning classes never wait on a wall plug.',
+    wx: 6.8,
+    wy: 7.4,
     accentColor: '#00C7FD',
     factionColor: 'Blue',
     avatarIdx: 3,
@@ -22,22 +23,22 @@ export const EXPO_PC_CATALOG: CatalogPcCharacter[] = [
     demoType: 'offline_ai',
     stationId: 'A',
     highlights: [
-      'Dedicated NPU runs study summaries & notes offline with zero Wi-Fi.',
-      'Low-Power Island E-Cores stretch unplugged classes past 20 hours.',
-      'Whisper-quiet cooling in libraries and hostel rooms.',
+      'Reads 60-page PDFs & lecture slides on the train with zero Wi-Fi.',
+      'Stays cool and whisper-silent at 2 AM while your family sleeps.',
+      'Survives lectures, labs, and evening commute past 20 hours.',
     ],
     chatText:
-      'Hail, Byte! I am Campus Dash, champion of the Blue Keep and powered by Intel Core Ultra 5. Unplug your charger all day—my dedicated NPU summarizes 60-page PDFs locally with zero Wi-Fi and zero battery panic!',
-    demoBurstLabel: 'OFFLINE AI STUDY DEMO · 0% CLOUD · 22H BATTERY',
+      'Morning, Byte! Remember staring at a 12% battery warning on the early train? Campus Dash on Intel Core Ultra 5 summarizes notes privately offline and lasts all day—so you never hunt for an outlet mid-lecture.',
+    demoBurstLabel: 'OFFLINE STUDY AI · 0% CLOUD · 22H BATTERY',
   },
   {
     id: 'pc_flowcraft_pro',
     name: 'FlowCraft Pro · Ultra 7',
     tierName: 'Intel Core Ultra 7 Evo Edition',
-    persona: 'The Multitasking Creator',
-    tagline: '300+ AI-accelerated apps running simultaneously across P-Cores, E-Cores & NPU.',
-    wx: 18,
-    wy: 9,
+    persona: 'The Late-Night Builder',
+    tagline: 'Splits heavy coding, slides, music, and 30 browser tabs cleanly without a single freeze.',
+    wx: 14.0,
+    wy: 6.4,
     accentColor: '#F59E0B',
     factionColor: 'Yellow',
     avatarIdx: 11,
@@ -45,22 +46,22 @@ export const EXPO_PC_CATALOG: CatalogPcCharacter[] = [
     demoType: 'multitask',
     stationId: 'C',
     highlights: [
-      'Hybrid architecture keeps 25 browser tabs, music & AI filters lag-free.',
-      'Hardware-accelerated Intel AI Boost across 300+ creative & dev apps.',
-      'Sleek metallic chassis built to stay fast for 4+ years of updates.',
+      'Juggles Figma, code editors, calls & 30 tabs without choking.',
+      'Runs 300+ AI creative & study apps right on the laptop.',
+      'Built like metal armor to carry you cleanly from freshman year to graduation.',
     ],
     chatText:
-      'Well met, Byte! FlowCraft Pro of the Golden Guild here with Intel Core Ultra 7. Coding, Figma, 30 Chrome tabs, and local AI copilot all at once? My P-Cores and E-Cores split the load with zero stutter!',
-    demoBurstLabel: '300+ AI APPS · HYBRID MULTITASKING · ZERO LAG',
+      'You made it to dawn, Byte! FlowCraft Pro on Core Ultra 7 separates heavy builds from background apps automatically—no spinning cursor at 1:47 AM when your deadline is thirteen minutes away.',
+    demoBurstLabel: '300+ AI APPS · ZERO STUTTER · GRADUATION READY',
   },
   {
     id: 'pc_apex_frame',
     name: 'Apex Frame · Ultra 9',
     tierName: 'Intel Core Ultra 9 Performance',
-    persona: 'The High-FPS XeSS Gamer',
-    tagline: 'Intel Arc Graphics + XMX XeSS AI Upscaling for crisp 120+ FPS without overheating.',
-    wx: 27,
-    wy: 10,
+    persona: 'The Midnight Squad Ace',
+    tagline: 'Intel Arc Graphics + XeSS AI delivers crisp 120 FPS weekends without waking the house.',
+    wx: 21.2,
+    wy: 7.4,
     accentColor: '#EF4444',
     factionColor: 'Red',
     avatarIdx: 6,
@@ -68,22 +69,22 @@ export const EXPO_PC_CATALOG: CatalogPcCharacter[] = [
     demoType: 'xess_fps',
     stationId: 'B',
     highlights: [
-      'XeSS AI Upscaling delivers smooth 120 FPS gameplay at cool thermals.',
-      'Run Discord, OBS stream overlays & local AI voice cleanup on the NPU.',
-      'Crushes flashy bargain laptops that throttle after 15 minutes.',
+      'XeSS AI turns sharp 120 FPS frames without melting your keyboard.',
+      'Keeps squad voice chat crystal clear while the fan stays calm.',
+      'Outlasts flashy bargain laptops that slow down after 15 minutes.',
     ],
     chatText:
-      'Strike true! Apex Frame of the Crimson Arena checking in with Intel Core Ultra 9 + Arc XeSS! Why let cheap laptops overheat? My XMX AI engines upscale crisp gaming frames so you stay cool and fast!',
-    demoBurstLabel: 'INTEL ARC + XeSS BOOST · 120 FPS LOCKED',
+      'GGs, Byte! After surviving finals week, you deserve Friday night matches that actually stay smooth. Apex Frame on Core Ultra 9 + Arc XeSS locks crisp frames without scorching your palms.',
+    demoBurstLabel: 'INTEL ARC + XeSS · COOL 120 FPS',
   },
   {
     id: 'pc_feather_air',
     name: 'FeatherAir · Ultra 5',
     tierName: 'Intel Core Ultra 5 Ultralight',
-    persona: 'The Backpack Commuter',
-    tagline: 'Featherweight metal build with instant wake and NPU webcam studio effects.',
-    wx: 12,
-    wy: 19,
+    persona: 'The Metro Commuter',
+    tagline: 'Under 1.2 kg everyday carry with instant wake and natural camera focus for interviews.',
+    wx: 7.2,
+    wy: 15.1,
     accentColor: '#A855F7',
     factionColor: 'Purple',
     avatarIdx: 16,
@@ -91,126 +92,126 @@ export const EXPO_PC_CATALOG: CatalogPcCharacter[] = [
     demoType: 'battery_air',
     stationId: 'A',
     highlights: [
-      'Under 1.2 kg design with all-day battery—leave the heavy brick at home.',
-      'Instant lid-open wake + NPU eye-contact & background blur on calls.',
-      'Cool, silent fanless-feel operation during cafes and metro rides.',
+      'Lighter than two textbooks—leaves the heavy power brick at home.',
+      'Wakes the second you open the lid between metro stops.',
+      'NPU camera lighting & voice clarity shine during internship calls.',
     ],
     chatText:
-      'Greetings, hero! I am FeatherAir of the Violet Abbey! Built for metro commutes and coffee-shop sprints—light as a parchment scroll, instant wake, and NPU Studio Effects that never drain your battery.',
-    demoBurstLabel: 'ULTRALIGHT 1.1KG · INSTANT WAKE · NPU CALL AI',
+      'Glad you are here, Byte! Two buses, a crowded train, and an internship call before noon—FeatherAir stays lighter than a notebook and keeps your camera and voice crisp without draining battery.',
+    demoBurstLabel: '1.1KG CARRY · INSTANT WAKE · INTERVIEW READY',
   },
   {
     id: 'pc_canvas_studio',
     name: 'Canvas Studio · Ultra 7',
     tierName: 'Intel Core Ultra 7 Creator',
-    persona: 'The Local Gen-AI Artist',
-    tagline: 'On-device AI image generation, auto-reframe video edits & private local models.',
-    wx: 24,
-    wy: 19,
-    accentColor: '#64748B',
+    persona: 'The Quiet Creator',
+    tagline: 'Generate artwork, trim 4K reels, and run private AI tools with zero monthly subscriptions.',
+    wx: 20.8,
+    wy: 15.5,
+    accentColor: '#94A3B8',
     factionColor: 'Black',
     avatarIdx: 21,
     accessory: 'stylus',
     demoType: 'creator_gen',
     stationId: 'C',
     highlights: [
-      'Generate images & smart video masks locally without cloud subscriptions.',
-      'Private on-device AI processing keeps client & college work on your SSD.',
-      'High-bandwidth memory + Arc GPU media engines accelerate 4K exports.',
+      'Create posters & smart video cuts locally—no paid cloud tokens.',
+      'Your drafts, family videos, and client files never leave your SSD.',
+      'Arc media engines speed through 4K renders before sunrise.',
     ],
     chatText:
-      'Welcome, Byte! Canvas Studio of the Obsidian Forge on Core Ultra 7 lets you run local image generation and video auto-cuts right on your laptop—no paid cloud tokens, total privacy!',
-    demoBurstLabel: 'LOCAL GEN-AI · PRIVATE ON-DEVICE · 4K MEDIA',
+      'Take a breath, Byte—the morning sun is up. Canvas Studio on Core Ultra 7 lets you cut reels and run local AI ideas right on your own laptop, with zero monthly fees and full privacy.',
+    demoBurstLabel: 'LOCAL CREATIVE AI · PRIVATE · ZERO FEES',
   },
 ];
 
 export const STORY_DIALOGUES: Record<string, DialogueStep> = {
-  // ACT I: BARGAIN TRAP ISLAND (BLUE PAWN)
+  // ACT I — 1:47 AM STUDY COVE (PAWN)
   trap_intro: {
     id: 'trap_intro',
-    speaker: 'GlitterBook Bargain PC',
-    role: '₹39,999 Crimson Trap Island',
+    speaker: '1:47 AM · Study Cove',
+    role: 'Act I · Before Sunrise',
     portrait: 'trap_laptop',
     avatarIdx: 7,
     factionColor: 'Red',
-    text: 'Look at these flashy bargain stickers and crimson banners! Grab your Pawn hammer and march north across Bargain Trap Island to test Offline Study AI AND a match at the Task Gate [WASD / Arrows]!',
+    text: '1:47 AM. The house is dark, save for your desk lamp and a cold mug of tea your mom left beside your books. Dad asked proudly if that ₹39,999 festive-sale laptop could carry you through college—now your final project is due at dawn, every tab is freezing, and the fans sound like a jet. Walk north to the Deadline Gate [WASD / Arrows]!',
     onCompleteEffect: {
-      questLabel: 'Walk north to the Overloaded Task Gate on Bargain Trap Island',
+      questLabel: 'Push north to the Deadline Gate before your battery dies',
     },
   },
 
   trap_meltdown: {
     id: 'trap_meltdown',
-    speaker: 'Byte (Blue Pawn)',
-    role: 'System Diagnostic',
+    speaker: 'Byte (Tired Freshman)',
+    role: 'Battery 12% · Draft Unsaved',
     portrait: 'pawn_worker',
     avatarIdx: 2,
     factionColor: 'Blue',
-    text: 'Whoa! No dedicated NPU! Every task piled onto one weak CPU lane—FPS dropped to 11, Red raiders are swarming the island, and battery plummeted from 90% to 12%!',
+    text: 'Everything just locked at 11 FPS. Not because you did not work hard enough—because one cramped bargain lane cannot carry your dreams, your notes, and your whole future at once. Dad saved months for that box, and the shiny sticker never warned either of you.',
     nextId: 'trap_warp',
   },
 
   trap_warp: {
     id: 'trap_warp',
-    speaker: 'Intel Core Ultra Beacon',
-    role: 'Bridge Upgrade · Pawn → Warrior',
+    speaker: 'Dawn Lantern Beacon',
+    role: 'Act II · Across the Quiet Bridge',
     portrait: 'agent',
     avatarIdx: 1,
     factionColor: 'Blue',
-    text: 'Flashy paint cannot fix weak silicon! Cross the bridge east into Silicon City—claim your Blue Warrior sword & shield in E-Core Park, and unite the Monk Library & Arc Archery!',
+    text: 'Pick up the Blue Knight blade and cross east into the Harbor of Quiet Hours. A laptop built right honors every late night and every rupee saved. Meet the Harbor Steward [E]—sunrise starts with breathing room.',
     onCompleteEffect: {
       restoreBattery: 100,
       restoreHp: 100,
-      questLabel: 'Talk to E-Core Steward [E] on the Emerald Island',
+      questLabel: 'Talk to the Harbor Steward [E] on the Emerald Harbor',
     },
   },
 
-  // ACT II: E-CORE PARK (BLUE WARRIOR UPGRADE)
+  // ACT II — HARBOR OF QUIET HOURS (BLUE WARRIOR AWAKENING)
   ecore_greeting: {
     id: 'ecore_greeting',
-    speaker: 'E-Core Steward',
-    role: 'Hybrid Power Park Keeper',
+    speaker: 'Harbor Steward',
+    role: 'Act II · Harbor of Quiet Hours',
     portrait: 'ecore_steward',
     avatarIdx: 4,
     factionColor: 'Blue',
-    text: 'Welcome to E-Core Efficiency Park, Warrior Byte! Inside Intel Core Ultra, we split work across Performance Cores, Efficiency Cores, and a Low-Power Island so background apps stay silent and battery lasts all day.',
+    text: 'Breathe easy, Byte—welcome to E-Core Harbor. Real strength is quiet: while background apps rest silently on gentle Efficiency Cores so nobody at home wakes up, your main work flies forward and your charger stays in your backpack all day.',
     nextId: 'ecore_need_choice',
   },
 
   ecore_need_choice: {
     id: 'ecore_need_choice',
-    speaker: 'E-Core Steward',
-    role: 'Choose Your Daily Priority',
+    speaker: 'Harbor Steward',
+    role: 'What Carries You Through the Semester?',
     portrait: 'ecore_steward',
     avatarIdx: 4,
     factionColor: 'Blue',
-    text: 'Tell me what you use a laptop for most so I can chart your Silicon City quest:',
+    text: 'Before crossing Copper Plaza, tell me which part of life matters most to you right now:',
     choices: [
       {
-        label: 'College classes & offline AI without Wi-Fi or battery anxiety',
+        label: 'Early morning commutes, classes & quiet offline study without outlet hunting',
         nextNodeId: 'ecore_after_choice',
         effect: {
           setNeed: 'learning',
           restoreBattery: 15,
-          questLabel: 'Head NW to Monk NPU Library [E] & NE to Yellow Arc Archery',
+          questLabel: 'Visit the Library of Unspoken Notes (West) & Dawn Arena (East)',
         },
       },
       {
-        label: 'Smooth high-FPS gaming with cool thermals & XeSS upscaling',
+        label: 'Unwinding Friday nights with friends at smooth FPS without melting your lap',
         nextNodeId: 'ecore_after_choice',
         effect: {
           setNeed: 'gaming',
           restoreBattery: 15,
-          questLabel: 'Head NW to NPU Library & NE to Arc XeSS Archery Arena [E]',
+          questLabel: 'Visit the Library (West) & Dawn Gaming Arena (East)',
         },
       },
       {
-        label: 'Coding, editing & zero-lag multitasking across heavy apps',
+        label: 'Juggling late-night projects, design, reels & 30 tabs without a single crash',
         nextNodeId: 'ecore_after_choice',
         effect: {
           setNeed: 'multitask',
           restoreBattery: 15,
-          questLabel: 'Explore NPU Library (West) & Arc XeSS Arena (East)',
+          questLabel: 'Explore the West Library & East Horizon Arena',
         },
       },
     ],
@@ -218,37 +219,37 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
 
   ecore_after_choice: {
     id: 'ecore_after_choice',
-    speaker: 'E-Core Steward',
-    role: 'Silicon City Unlocked',
+    speaker: 'Harbor Steward',
+    role: 'Two Wings of the City',
     portrait: 'ecore_steward',
     avatarIdx: 4,
     factionColor: 'Blue',
-    text: 'Onward! Cross Copper Bus Plaza north: visit the Offline Study Monastery on the WEST for NPU Heal Pulse, and the Yellow Arc Archery Arena on the EAST for Frame Surge. Swing your blade with [O] and raise Guard Dash with [Space]!',
+    text: 'Cross Copper Plaza north! To the WEST waits the Library of Unspoken Notes; to the EAST waits the Dawn Horizon Arena. Rescue the stranded projects along your path with [O] Slash and guard-dash danger with [Space]!',
   },
 
-  // WEST DISTRICT: NPU MONASTERY & OFFLINE STUDY LIBRARY
+  // ACT III-A — WEST: LIBRARY OF UNSPOKEN NOTES (NPU MONASTERY)
   npu_intro: {
     id: 'npu_intro',
-    speaker: 'NPU Monk Sentinel',
-    role: 'Offline Study Monastery · Intel AI Boost',
+    speaker: 'Keeper of Quiet Notes',
+    role: 'Act III · Library of Unspoken Notes',
     portrait: 'npu_sentinel',
     avatarIdx: 5,
     factionColor: 'Purple',
-    text: 'Peace, Byte! Welcome to the NPU Monastery & Offline Study Library. Shoppers wonder what NPU & TOPS mean: CPU is a sprinter, GPU is an artist, and I am the dedicated AI marathon runner!',
+    text: 'Welcome inside, Byte. People throw scary words like NPU and TOPS around, so let us keep it human: when you are on a noisy evening bus with zero signal, you still need a quiet partner that organizes your notes without draining your battery or charging a monthly fee.',
     nextId: 'npu_explain',
   },
 
   npu_explain: {
     id: 'npu_explain',
-    speaker: 'NPU Monk Sentinel',
-    role: '300+ Optimized AI Apps · Private & Offline',
+    speaker: 'Keeper of Quiet Notes',
+    role: 'Help That Stays Private & Yours',
     portrait: 'npu_sentinel',
     avatarIdx: 5,
     factionColor: 'Purple',
-    text: 'I sustain continuous AI across 300+ supported apps right on your device—no cloud fees, total privacy, and tiny wattage so your battery endures past 20+ hours!',
+    text: 'Intel AI Boost NPU runs 300+ everyday tools right on your laptop—summaries, clear meeting audio, study prep—completely private on your own drive, sipping a fraction of the power so your battery lives past sunrise.',
     choices: [
       {
-        label: 'Bestow the NPU Heal & Shockwave Pulse! [Unlock P]',
+        label: 'Accept the NPU Clarity Pulse! [Unlock P]',
         nextNodeId: 'npu_unlocked',
         effect: {
           unlockNpuPulse: true,
@@ -257,7 +258,7 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
         },
       },
       {
-        label: 'Explain TOPS in simple real-world terms first',
+        label: 'Wait—what does TOPS actually feel like in daily life?',
         nextNodeId: 'npu_tops_answer',
       },
     ],
@@ -265,12 +266,12 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
 
   npu_tops_answer: {
     id: 'npu_tops_answer',
-    speaker: 'NPU Monk Sentinel',
-    role: 'TOPS = Trillions of Operations Per Second',
+    speaker: 'Keeper of Quiet Notes',
+    role: 'Why Dedicated AI Matters',
     portrait: 'npu_sentinel',
     avatarIdx: 5,
     factionColor: 'Purple',
-    text: 'Higher TOPS means local AI—like summarizing huge college PDFs on a train with zero Wi-Fi—finishes in seconds without freezing your screen. Receive my NPU Pulse!',
+    text: 'Think of TOPS as quiet endurance: instead of freezing your music or eating battery to summarize a 60-page lab manual offline, it finishes cleanly in seconds while you stay focused. Take my Clarity Pulse!',
     onCompleteEffect: {
       unlockNpuPulse: true,
       restoreBattery: 25,
@@ -280,37 +281,37 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
 
   npu_unlocked: {
     id: 'npu_unlocked',
-    speaker: 'Byte (Blue Warrior)',
-    role: 'Power Unlocked: [P] NPU Pulse',
+    speaker: 'Byte (Blue Knight)',
+    role: 'Skill Awakened: [P] NPU Clarity Pulse',
     portrait: 'agent',
     avatarIdx: 1,
     factionColor: 'Blue',
-    text: 'NPU Pulse ready! Pressing [P] channels Monk healing light that shatters enemy lag shields, restores vitality, and frees trapped Gold & Wood tasks!',
+    text: 'Clarity Pulse feels calm and steady! Pressing [P] heals Byte, shatters false shields, and frees trapped midnight projects.',
   },
 
-  // EAST DISTRICT: ARC XeSS ARCHERY ARENA
+  // ACT III-B — EAST: DAWN HORIZON ARENA (ARC XeSS)
   arc_intro: {
     id: 'arc_intro',
-    speaker: 'Arc Archer Warden',
-    role: 'Arc XeSS Archery Arena',
+    speaker: 'Horizon Captain',
+    role: 'Act III · Dawn Horizon Arena',
     portrait: 'arc_warden',
     avatarIdx: 13,
     factionColor: 'Yellow',
-    text: 'Eyes sharp, Byte! Cheap laptops choke in battles because they brute-force every pixel until the chip overheats. Inside Intel Core Ultra, XMX AI engines power Intel XeSS!',
+    text: 'Good to see you standing tall, Byte! Everybody works hard all week—at midnight, playing a match with friends or editing a short film should feel effortless, not like holding a burning stove on your lap.',
     nextId: 'arc_explain',
   },
 
   arc_explain: {
     id: 'arc_explain',
-    speaker: 'Arc Archer Warden',
-    role: 'AI-Upscaled 120 FPS Gaming',
+    speaker: 'Horizon Captain',
+    role: 'Intel Arc + XeSS Horizon Surge',
     portrait: 'arc_warden',
     avatarIdx: 13,
     factionColor: 'Yellow',
-    text: 'XeSS renders smart and uses AI upscaling for razor-sharp, high-FPS gameplay while keeping thermals cool and battery steady!',
+    text: 'Intel Arc Graphics with XeSS AI paints crisp high-FPS frames cleanly without brute-force heat—so your hands stay cool, the room stays quiet, and your laptop lasts for years instead of months.',
     choices: [
       {
-        label: 'Fuse XeSS Frame Surge with my Warrior Blade!',
+        label: 'Awaken XeSS Horizon Surge on my blade!',
         nextNodeId: 'arc_unlocked',
         effect: {
           unlockXessSurge: true,
@@ -322,51 +323,51 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
 
   arc_unlocked: {
     id: 'arc_unlocked',
-    speaker: 'Arc Archer Warden',
-    role: 'XeSS Surge Online',
+    speaker: 'Horizon Captain',
+    role: 'Both Halves United',
     portrait: 'arc_warden',
-    avatarIdx: 13,
+    avatarIdx: 1,
     factionColor: 'Yellow',
-    text: 'XeSS Frame Surge equipped! Your sword strikes faster and [P] ignites a 120 FPS aura. With both NPU and Arc powers forged, storm NORTH into the Black Colosseum!',
+    text: 'Horizon Surge is yours—swings cut faster and [P] ignites at 120 FPS! Both quiet endurance and fearless speed are ready. March NORTH across the causeway and break Burnout forever!',
   },
 
-  // NORTH DISTRICT: BOSS COLOSSEUM
+  // ACT IV — THE BURNOUT CITADEL (BOSS FIGHT)
   boss_intro: {
     id: 'boss_intro',
-    speaker: 'The Lag Titan (Black Warlord)',
-    role: 'Overclocked Colosseum Overlord',
+    speaker: 'The Lag Titan',
+    role: 'Act IV · Voice of Burnout & Bargain Regret',
     portrait: 'lag_titan',
     avatarIdx: 21,
     factionColor: 'Black',
-    text: 'HAHAHA! Who needs an NPU when buyers get hypnotized by my 70% OFF banners and Black Fortress Towers?! Let us see one Blue Warrior survive my Thermal Throttling!',
+    text: 'Still awake at 2:30 AM? Admit it—most buyers never look past my shiny 70% OFF box! Why dream big when you can watch spinning cursors, hot keyboards, and dead batteries for the next four years?',
     nextId: 'boss_agent_reply',
   },
 
   boss_agent_reply: {
     id: 'boss_agent_reply',
-    speaker: 'Byte (Blue Warrior)',
-    role: 'Core Ultra Synced',
+    speaker: 'Byte (Blue Knight)',
+    role: 'For Every Late Night & Every Dream',
     portrait: 'agent',
     avatarIdx: 1,
     factionColor: 'Blue',
-    text: 'Time to breach that Black Citadel! Guard-dash red floor slams and Archer volleys with [Space], shatter its RGB shield with [P], and strike with [O]!',
+    text: 'My parents worked too hard for me to settle for broken promises—and tomorrow begins at sunrise. Dodge red floor slams with [Space], shatter that hollow RGB shield with [P], and strike back with [O]!',
     onCompleteEffect: {
       startBossFight: true,
-      questLabel: 'Defeat the Black Lag Titan! [O] Slash · [P] NPU/XeSS · [Space] Guard Dash',
+      questLabel: 'Defeat the Lag Titan! [O] Slash · [P] Clarity/XeSS · [Space] Guard Dash',
     },
   },
 
-  // EXPO PARK ARRIVAL
+  // ACT V — DAWN IN THE INTEL FESTIVAL COURTYARD
   expo_welcome: {
     id: 'expo_welcome',
-    speaker: 'Byte (Blue Warrior)',
-    role: 'Silicon City → Intel AI PC Expo Park',
+    speaker: 'Byte (Blue Knight)',
+    role: 'Act V · Dawn Over Intel AI PC Courtyard',
     portrait: 'agent',
     avatarIdx: 1,
     factionColor: 'Blue',
-    text: 'VICTORY! Silicon City transformed into the Intel AI PC Expo Park! Watch the 5 faction Champions sparring at their castles and press [E] beside any booth—the Champion wearing the Golden Crown is your Best Match!',
+    text: 'Morning light broke through! Look around the Intel Festival Courtyard—all five champions are sparring in celebration, and the one wearing the Golden Crown fits your semester story best. Press [E] beside any champion or Intel booth, and check [C] for your real store checklist!',
     onCompleteEffect: {
-      questLabel: 'Meet sparring AI PC Champions [E] · Open Store Checklist [C]',
+      questLabel: 'Meet sparring Champions [E] · Open Store Checklist [C]',
     },
   },
 };
@@ -415,11 +416,11 @@ export function computeRecommendation(
       tierName: pc.tierName,
       archetypeTitle: pc.persona,
       tagline: pc.tagline,
-      matchReason: `Matched from your ${profile.primaryNeed} focus and ${Math.round(profile.batteryRemaining)}% battery endurance after rescuing ${profile.tasksRescued} tasks.`,
+      matchReason: `Matched from your ${profile.primaryNeed} focus and ${Math.round(profile.batteryRemaining)}% battery endurance after rescuing ${profile.tasksRescued} late-night projects.`,
       highlights: [
         { label: 'XeSS AI Upscaling', detail: pc.highlights[0] },
         { label: 'Dedicated NPU + Arc GPU', detail: pc.highlights[1] },
-        { label: 'Zero Thermal Throttling', detail: pc.highlights[2] },
+        { label: 'Cool Late-Night Thermals', detail: pc.highlights[2] },
       ],
       station: STORE_STATIONS.B,
       checklist: [
@@ -441,7 +442,7 @@ export function computeRecommendation(
         {
           id: 'c4',
           title: 'Spot the Core Ultra Badge',
-          howToTest: 'Confirm the metallic Intel Core Ultra sticker on the palm rest.',
+          howToTest: 'Confirm the metallic Intel Core Ultra badge on the palm rest.',
         },
       ],
     };
@@ -453,17 +454,17 @@ export function computeRecommendation(
       tierName: pc.tierName,
       archetypeTitle: pc.persona,
       tagline: pc.tagline,
-      matchReason: `Matched from your ${profile.primaryNeed} style and ${Math.round(profile.batteryRemaining)}% battery saved across Silicon City.`,
+      matchReason: `Matched from your ${profile.primaryNeed} rhythm and ${Math.round(profile.batteryRemaining)}% battery saved across Silicon City.`,
       highlights: [
         { label: 'Hybrid Core Scheduling', detail: pc.highlights[0] },
         { label: '300+ AI-Accelerated Apps', detail: pc.highlights[1] },
-        { label: 'Long-Term Performance', detail: pc.highlights[2] },
+        { label: 'Built to Last All Degree', detail: pc.highlights[2] },
       ],
       station: STORE_STATIONS.C,
       checklist: [
         {
           id: 'c1',
-          title: 'Inspect Task Manager → NPU',
+          title: 'Inspect Task Manager -> NPU',
           howToTest: 'Open Task Manager on the Station C demo laptop to see the Intel AI Boost NPU active.',
         },
         {

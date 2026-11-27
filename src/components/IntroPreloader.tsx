@@ -50,18 +50,18 @@ export function IntroPreloader({ onFinish, onStartGame }: IntroPreloaderProps) {
         y: '-100%',
         transition: { duration: 0.62, ease: [0.16, 1, 0.3, 1] },
       }}
-      className="landing-sketch-root fixed inset-0 z-50 flex flex-col justify-between border-b-2 border-[#111827] bg-[#FAF8F5] px-6 py-6 md:px-12 md:py-9"
+      className="landing-sketch-root fixed inset-0 z-50 flex flex-col justify-between border-b-2 border-[#111827] bg-[#FAF8F5] px-6 py-6 dark:border-[#334155] dark:bg-[#0B1120] md:px-12 md:py-9"
     >
       {/* Top Blueprint Header Strip */}
       <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="font-editorial text-xl font-bold tracking-tight text-[#111827]">
+          <span className="font-editorial text-xl font-bold tracking-tight text-[#111827] dark:text-[#F3F4F6]">
             Jevtel
           </span>
-          <span aria-hidden="true" className="text-[#CBD5E1]">
+          <span aria-hidden="true" className="text-[#CBD5E1] dark:text-[#334155]">
             ·
           </span>
-          <span className="font-mono-tabular text-xs font-medium text-[#6B7280]">
+          <span className="font-mono-tabular text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
             Intel Core Ultra Showcase
           </span>
         </div>
@@ -69,7 +69,7 @@ export function IntroPreloader({ onFinish, onStartGame }: IntroPreloaderProps) {
         <button
           type="button"
           onClick={onFinish}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4B5563] transition-colors hover:text-[#111827] whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4B5563] transition-colors hover:text-[#111827] dark:text-[#9CA3AF] dark:hover:text-[#F3F4F6] whitespace-nowrap shrink-0"
         >
           <span>Skip intro</span>
           <ArrowRight className="h-3.5 w-3.5" />
@@ -82,7 +82,7 @@ export function IntroPreloader({ onFinish, onStartGame }: IntroPreloaderProps) {
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-[#111827] bg-white shadow-[4px_4px_0px_#111827]"
+          className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-[#111827] bg-white shadow-[4px_4px_0px_#111827] dark:border-[#334155] dark:bg-[#111827] dark:shadow-[4px_4px_0px_#020617]"
         >
           <img
             src={TINY_SWORDS_AVATARS[0]}
@@ -97,25 +97,25 @@ export function IntroPreloader({ onFinish, onStartGame }: IntroPreloaderProps) {
             initial={{ y: '100%' }}
             animate={{ y: '0%' }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="font-editorial text-[clamp(2rem,4.5vw,3.5rem)] font-bold leading-none tracking-tight text-[#111827]"
+            className="font-editorial text-[clamp(2rem,4.5vw,3.5rem)] font-bold leading-none tracking-tight text-[#111827] dark:text-[#F3F4F6]"
           >
             Entering Silicon City
           </motion.div>
         </div>
 
-        <p className="mt-2.5 text-sm font-medium text-[#4B5563]">
+        <p className="mt-2.5 text-sm font-medium text-[#4B5563] dark:text-[#9CA3AF]">
           Preparing Byte&apos;s adventure and live hardware benchmarks
         </p>
 
         {/* Crisp Architectural Progress Hairline + Tabular Counter */}
         <div className="mt-7 w-full max-w-md">
           <div className="mb-2 flex items-baseline justify-between font-mono-tabular text-xs font-bold">
-            <span className="text-[#0068B5]">Jevtel Engine</span>
-            <span className="text-lg text-[#111827]">
+            <span className="text-[#0068B5] dark:text-[#38BDF8]">Jevtel Engine</span>
+            <span className="text-lg text-[#111827] dark:text-[#F3F4F6]">
               {String(progress).padStart(2, '0')}%
             </span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full border border-[#111827]/20 bg-white">
+          <div className="h-2 w-full overflow-hidden rounded-full border border-[#111827]/20 bg-white dark:border-[#334155] dark:bg-[#111827]">
             <div
               className="h-full rounded-full bg-[#0068B5] transition-transform duration-75 origin-left"
               style={{ transform: `scaleX(${progress / 100})` }}
@@ -133,7 +133,7 @@ export function IntroPreloader({ onFinish, onStartGame }: IntroPreloaderProps) {
           <button
             type="button"
             onClick={onStartGame}
-            className="inline-flex items-center gap-2.5 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-6 py-3 text-sm font-bold text-white shadow-[4px_4px_0px_#111827] transition-transform duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-[#005291] whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2.5 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-6 py-3 text-sm font-bold text-white shadow-[4px_4px_0px_#111827] transition-transform duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:bg-[#005291] dark:border-[#38BDF8] whitespace-nowrap shrink-0"
           >
             <Gamepad2 className="h-4 w-4 shrink-0" />
             <span>Get Over Here, Byte needs you!</span>
@@ -142,7 +142,7 @@ export function IntroPreloader({ onFinish, onStartGame }: IntroPreloaderProps) {
       </div>
 
       {/* Bottom Corner Ticks */}
-      <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between font-mono-tabular text-[11px] font-medium text-[#6B7280]">
+      <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between font-mono-tabular text-[11px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">
         <span>+ Byte Quest Ready</span>
         <span>+ 5-Slot PC Builder Ready</span>
       </div>

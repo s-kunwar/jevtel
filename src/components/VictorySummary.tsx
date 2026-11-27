@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Circle, Shield } from 'lucide-react';
+import { CheckCircle2, Circle, MessageSquareText, Shield } from 'lucide-react';
 import { INTEL_HARDWARE_URLS, TINY_SWORDS_AVATARS, TINY_SWORDS_UI } from '../game/assets';
 import { computeRecommendation, EXPO_PC_CATALOG, STORE_STATIONS } from '../game/storyData';
 import type { PlayerProfile } from '../game/types';
@@ -12,6 +12,7 @@ interface VictorySummaryProps {
   onCloseModal?: () => void;
   onPlayAgain: () => void;
   onSendToLandingChecklist?: (profile: PlayerProfile, matchedPcId: string) => void;
+  onAskNovaFromQuest?: (profile: PlayerProfile, matchedPcId: string) => void;
 }
 
 export function VictorySummary({
@@ -22,6 +23,7 @@ export function VictorySummary({
   onCloseModal,
   onPlayAgain,
   onSendToLandingChecklist,
+  onAskNovaFromQuest,
 }: VictorySummaryProps) {
   const [checkedIds, setCheckedIds] = useState<Record<string, boolean>>({});
   const [heroErr, setHeroErr] = useState(false);
@@ -60,14 +62,14 @@ export function VictorySummary({
 
           <div className="ts-paper-panel">
             <h2 className="font-display text-2xl font-bold text-[#2B1B12] md:text-3xl">
-              Lag Titan Overloaded!
+              2:45 AM · Battery Exhausted
             </h2>
             <p className="mt-3 text-sm font-medium leading-relaxed text-[#3E271A]">
-              Byte took heavy hits from the Black Citadel—use{' '}
+              Burnout overwhelmed Byte before dawn—use{' '}
               <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[#BAE6FD]">Space</kbd>{' '}
               to Guard Dash through red slams and{' '}
               <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[#FDE68A]">P</kbd>{' '}
-              to shatter its RGB shield!
+              to shatter the hollow RGB shield!
             </p>
             <button
               type="button"
@@ -100,6 +102,16 @@ export function VictorySummary({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {onAskNovaFromQuest && (
+              <button
+                type="button"
+                onClick={() => onAskNovaFromQuest(profile, matchedPc.id)}
+                className="ts-btn-blue inline-flex items-center gap-2 font-display text-xs font-bold text-white whitespace-nowrap shrink-0"
+              >
+                <MessageSquareText className="h-3.5 w-3.5" />
+                <span>Ask NOVA Advisor</span>
+              </button>
+            )}
             {onSendToLandingChecklist && (
               <button
                 type="button"

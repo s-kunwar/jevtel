@@ -126,6 +126,7 @@ export interface HudSnapshot {
   bossMaxHp: number;
   bossShield: number;
   bossMaxShield: number;
+  twinBosses?: { name: string; hp: number; maxHp: number }[];
   bannerText: string | null;
   inExpoPark: boolean;
   matchedPcId: string;

@@ -1,4 +1,5 @@
 import { EDITORIAL_ART_URLS } from '../game/assets';
+import { LandingRoamingTrack, type RoamingTrackVariant } from './LandingRoamingTrack';
 
 export function HandUnderline({ className = '' }: { className?: string }) {
   return (
@@ -212,7 +213,7 @@ export function SketchSectionDivider({ label }: { label?: string }) {
           <path d="M10 2V6M18 2V6M10 22V26M18 22V26M2 10H6M2 18H6M22 10H26M22 18H26" stroke="#1F2937" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
         {label && (
-          <span className="font-hand-display text-lg font-bold tracking-wide text-[#4B5563]">
+          <span className="font-hand-display text-lg font-bold tracking-wide text-[#4B5563] dark:text-[#9CA3AF]">
             {label}
           </span>
         )}
@@ -237,8 +238,189 @@ export function NotebookSpotArt({ className = '' }: { className?: string }) {
         src={EDITORIAL_ART_URLS.notebookDoodle}
         alt=""
         referrerPolicy="no-referrer"
-        className="h-full w-full object-contain mix-blend-multiply opacity-90"
+        className="h-full w-full object-contain mix-blend-multiply opacity-90 dark:mix-blend-normal dark:opacity-80"
       />
     </div>
+  );
+}
+
+/**
+ * Minimal architectural Intel silicon blueprint seal & PCB trace bus
+ * placed gently inside whitespace dividers between landing sections.
+ */
+export function IntelBlueprintDivider({
+  label,
+  roamingVariant,
+  className = '',
+}: {
+  label?: string;
+  roamingVariant?: RoamingTrackVariant;
+  className?: string;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none relative mx-auto flex max-w-[1200px] items-center justify-center gap-4 px-6 select-none md:px-10 ${
+        roamingVariant ? 'pt-9 pb-3' : 'py-3'
+      } ${className}`}
+    >
+      {roamingVariant && <LandingRoamingTrack variant={roamingVariant} />}
+      {/* Left PCB Trace Bus */}
+      <svg
+        viewBox="0 0 420 34"
+        fill="none"
+        className="h-7 flex-1 text-[#0068B5] opacity-30 dark:text-[#38BDF8] dark:opacity-25"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0 17H280L294 9H420"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M48 25H312L326 17H420"
+          stroke="#94A3B8"
+          strokeWidth="1"
+          strokeDasharray="4 4"
+        />
+        <circle cx="48" cy="25" r="2.2" fill="currentColor" />
+        <circle cx="176" cy="17" r="2.2" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        <circle cx="294" cy="9" r="2.4" fill="currentColor" />
+      </svg>
+
+      {/* Center Minimal Intel Silicon Wafer Cross-Section Seal */}
+      <div className="relative flex items-center gap-3 px-2 opacity-65 dark:opacity-55">
+        <svg viewBox="0 0 56 56" fill="none" className="h-10 w-10 shrink-0">
+          {/* Outer octagonal wafer ring */}
+          <polygon
+            points="18,4 38,4 52,18 52,38 38,52 18,52 4,38 4,18"
+            className="stroke-[#0068B5] dark:stroke-[#38BDF8]"
+            strokeWidth="1.2"
+            strokeDasharray="3 2"
+          />
+          <rect
+            x="14"
+            y="14"
+            width="28"
+            height="28"
+            rx="4"
+            className="stroke-[#1E293B] dark:stroke-[#94A3B8]"
+            strokeWidth="1.3"
+          />
+          {/* Compute / Arc / NPU die subdivisions */}
+          <rect
+            x="18.5"
+            y="18.5"
+            width="9.5"
+            height="9.5"
+            rx="1.5"
+            className="fill-[#0068B5]/15 stroke-[#0068B5] dark:fill-[#38BDF8]/15 dark:stroke-[#38BDF8]"
+            strokeWidth="1.1"
+          />
+          <rect
+            x="30"
+            y="18.5"
+            width="7.5"
+            height="9.5"
+            rx="1.5"
+            className="stroke-[#64748B] dark:stroke-[#94A3B8]"
+            strokeWidth="1"
+          />
+          <rect
+            x="18.5"
+            y="30"
+            width="19"
+            height="7.5"
+            rx="1.5"
+            className="fill-[#0068B5]/20 stroke-[#0068B5] dark:fill-[#38BDF8]/20 dark:stroke-[#38BDF8]"
+            strokeWidth="1.1"
+          />
+          {/* Perimeter pin ticks */}
+          <path
+            d="M21 9V14M28 9V14M35 9V14M21 42V47M28 42V47M35 42V47M9 21H14M9 28H14M9 35H14M42 21H47M42 28H47M42 35H47"
+            className="stroke-[#64748B] dark:stroke-[#64748B]"
+            strokeWidth="1.1"
+            strokeLinecap="round"
+          />
+        </svg>
+
+        <div className="flex flex-col leading-none">
+          <span className="font-mono-tabular text-[10px] font-bold tracking-[0.22em] text-[#0068B5] dark:text-[#38BDF8]">
+            intel · CORE ULTRA
+          </span>
+          {label && (
+            <span className="mt-1 font-mono-tabular text-[9px] font-medium tracking-wider text-[#64748B] dark:text-[#94A3B8]">
+              {label}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Right PCB Trace Bus */}
+      <svg
+        viewBox="0 0 420 34"
+        fill="none"
+        className="h-7 flex-1 text-[#0068B5] opacity-30 dark:text-[#38BDF8] dark:opacity-25"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0 9H126L140 17H420"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M0 17H94L108 25H372"
+          stroke="#94A3B8"
+          strokeWidth="1"
+          strokeDasharray="4 4"
+        />
+        <circle cx="126" cy="9" r="2.4" fill="currentColor" />
+        <circle cx="244" cy="17" r="2.2" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        <circle cx="372" cy="25" r="2.2" fill="currentColor" />
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * Restrained architectural corner silicon stamp for section outer whitespace.
+ */
+export function IntelMarginSeal({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 180 180"
+      fill="none"
+      className={`pointer-events-none select-none text-[#0068B5] opacity-[0.075] dark:text-[#38BDF8] dark:opacity-[0.08] ${className}`}
+    >
+      <circle cx="90" cy="90" r="76" stroke="currentColor" strokeWidth="1.4" strokeDasharray="5 4" />
+      <circle cx="90" cy="90" r="58" stroke="currentColor" strokeWidth="1" />
+      <rect x="60" y="60" width="60" height="60" rx="8" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="68" y="68" width="20" height="20" rx="3" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="92" y="68" width="20" height="20" rx="3" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="68" y="92" width="44" height="20" rx="3" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M72 48V60M90 48V60M108 48V60M72 120V132M90 120V132M108 120V132M48 72H60M48 90H60M48 108H60M120 72H132M120 90H132M120 108H132"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <text
+        x="90"
+        y="156"
+        textAnchor="middle"
+        fill="currentColor"
+        fontSize="10"
+        fontFamily="JetBrains Mono, monospace"
+        fontWeight="700"
+        letterSpacing="2"
+      >
+        SILICON ARCHIVE
+      </text>
+    </svg>
   );
 }

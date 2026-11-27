@@ -97,7 +97,7 @@ interface EcosystemVillager {
 interface IntelHardwareProp {
   id: string;
   hardwareKey: IntelHardwareKey;
-  kind: 'chip' | 'aiPc' | 'booth' | 'trapLaptop';
+  kind: 'chip' | 'aiPc' | 'booth' | 'stallStudent' | 'stallGaming' | 'stallCreator' | 'trapLaptop';
   wx: number;
   wy: number;
   label: string;
@@ -110,14 +110,28 @@ interface CloudEntity {
   speed: number;
   variant: number;
   scale: number;
+  layer: 0 | 1;
 }
 
-type EnemyClass = 'red_warrior' | 'red_archer' | 'red_pawn' | 'purple_lancer' | 'black_warrior' | 'black_archer';
+type EnemyClass =
+  | 'red_warrior'
+  | 'red_archer'
+  | 'red_pawn'
+  | 'purple_lancer'
+  | 'black_warrior'
+  | 'black_archer'
+  | 'spectral_knight';
 
 interface EnemyEntity {
   id: number;
   unitClass: EnemyClass;
   faction: FactionColor;
+  islandTier: 1 | 2 | 3 | 4;
+  damage: number;
+  speedMult: number;
+  isSpectral?: boolean;
+  riseElapsed?: number;
+  riseDuration?: number;
   wx: number;
   wy: number;
   vx: number;
@@ -131,6 +145,28 @@ interface EnemyEntity {
   flipX: boolean;
 }
 
+interface TwinBossEntity {
+  id: number;
+  name: string;
+  wx: number;
+  wy: number;
+  hp: number;
+  maxHp: number;
+  state: 'IDLE' | 'WINDUP_SLAM' | 'WINDUP_FAN' | 'COOLDOWN';
+  stateTimer: number;
+  hitFlash: number;
+  attackAlt: boolean;
+  flipX: boolean;
+}
+
+interface DarkPortal {
+  wx: number;
+  wy: number;
+  elapsed: number;
+  duration: number;
+  spawned: boolean;
+}
+
 interface BossEntity {
   active: boolean;
   wx: number;
@@ -140,18 +176,21 @@ interface BossEntity {
   shield: number;
   maxShield: number;
   phase: 1 | 2 | 3;
+  splitActive: boolean;
   state: 'IDLE' | 'WINDUP_SLAM' | 'WINDUP_FAN' | 'WINDUP_RING' | 'STUNNED' | 'COOLDOWN';
   stateTimer: number;
   hitFlash: number;
   attackCombo: number;
   towerTimer: number;
-  decoys: { wx: number; wy: number; life: number }[];
+  portalCooldown: number;
+  portals: DarkPortal[];
+  twins: TwinBossEntity[];
 }
 
 interface NpcEntity {
   id: string;
   name: string;
-  kind: 'ecore' | 'npu' | 'arc' | 'trap_gate' | 'boss_gate';
+  kind: 'ecore' | 'npu' | 'arc';
   wx: number;
   wy: number;
   dialogueId: string;
@@ -183,6 +222,7 @@ interface Projectile {
   life: number;
   color: string;
   radius: number;
+  damage?: number;
   arrowFaction?: FactionColor;
 }
 
@@ -276,8 +316,8 @@ export class SiliconWorldEngine {
   private phase: GamePhase = 'TITLE';
   private zone: WorldZoneId = 'SILICON_CITY';
   private map: GroundKind[][] = [];
-  private mapW = 64;
-  private mapH = 48;
+  private mapW = 46;
+  private mapH = 35;
 
   private buildings: BuildingLandmark[] = [];
   private props: PropItem[] = [];
@@ -289,8 +329,8 @@ export class SiliconWorldEngine {
   private signposts: { wx: number; wy: number; label: string; color: string }[] = [];
 
   private player = {
-    wx: 9.5,
-    wy: 41.5,
+    wx: 6.5,
+    wy: 30.2,
     facingAngle: -Math.PI / 2,
     flipX: false,
     moving: false,
@@ -357,19 +397,22 @@ export class SiliconWorldEngine {
 
   private boss: BossEntity = {
     active: false,
-    wx: 32,
-    wy: 8.5,
-    hp: 360,
-    maxHp: 360,
-    shield: 70,
-    maxShield: 70,
+    wx: 23.5,
+    wy: 6.4,
+    hp: 380,
+    maxHp: 380,
+    shield: 75,
+    maxShield: 75,
     phase: 1,
+    splitActive: false,
     state: 'IDLE',
     stateTimer: 1.2,
     hitFlash: 0,
     attackCombo: 0,
     towerTimer: 2.8,
-    decoys: [],
+    portalCooldown: 4.5,
+    portals: [],
+    twins: [],
   };
 
   private nextEntityId = 1;
@@ -393,8 +436,40 @@ export class SiliconWorldEngine {
   private specialBuffer = 0;
   private interactBuffer = 0;
   private cloudShadowCache = new Map<number, HTMLCanvasElement>();
+  private stormCloudCache = new Map<number, HTMLCanvasElement>();
   private blurCanvas: HTMLCanvasElement | null = null;
   private blurCtx: CanvasRenderingContext2D | null = null;
+  private flashCanvas: HTMLCanvasElement | null = null;
+  private flashCtx: CanvasRenderingContext2D | null = null;
+  private spectralCanvas: HTMLCanvasElement | null = null;
+  private spectralCtx: CanvasRenderingContext2D | null = null;
+
+  private stormIntensity = 0;
+  private weatherMix: Record<DistrictId, number> = {
+    TRAP_ALLEY: 1,
+    ECORE_PARK: 0,
+    COPPER_PLAZA: 0,
+    NPU_LIBRARY: 0,
+    ARC_ARENA: 0,
+    BOSS_COLOSSEUM: 0,
+    EXPO_PARK: 0,
+  };
+  private lightningTimer = 3.2;
+  private lightningFlash = 0;
+  private lightningSeed = 0;
+  private rainDrops = Array.from({ length: 64 }, (_, i) => ({
+    x: ((i * 73) % 100) / 100,
+    y: ((i * 41) % 100) / 100,
+    len: 14 + (i % 4) * 6,
+    speed: 1.35 + (i % 5) * 0.22,
+  }));
+  private weatherMotes = Array.from({ length: 42 }, (_, i) => ({
+    x: ((i * 61 + 13) % 100) / 100,
+    y: ((i * 37 + 7) % 100) / 100,
+    size: 2 + (i % 4) * 1.1,
+    speed: 0.14 + (i % 6) * 0.05,
+    phase: i * 0.77,
+  }));
 
   constructor(canvas: HTMLCanvasElement, callbacks: WorldEngineCallbacks) {
     this.canvas = canvas;
@@ -414,13 +489,18 @@ export class SiliconWorldEngine {
   }
 
   private initClouds(): void {
-    this.clouds = Array.from({ length: 10 }, (_, i) => ({
-      wx: -6 + ((i * 7.8) % 74),
-      wy: 3 + ((i * 6.4) % 41),
-      speed: 0.34 + (i % 4) * 0.13,
-      variant: i % 8,
-      scale: 1.15 + (i % 3) * 0.24,
-    }));
+    // 2x layered clouds with gentle parallax drift speeds across compact 46x35 archipelago
+    this.clouds = Array.from({ length: 18 }, (_, i) => {
+      const layer: 0 | 1 = i % 2 === 0 ? 0 : 1;
+      return {
+        wx: -5 + ((i * 3.1 + (layer === 1 ? 1.5 : 0)) % 56),
+        wy: 1.8 + ((i * 3.7 + (layer === 1 ? 1.9 : 0)) % 31.5),
+        speed: layer === 0 ? 0.24 + (i % 3) * 0.08 : 0.42 + (i % 4) * 0.1,
+        variant: i % 8,
+        scale: layer === 0 ? 0.9 + (i % 3) * 0.16 : 1.14 + (i % 3) * 0.2,
+        layer,
+      };
+    });
   }
 
   public startLoop(): void {
@@ -452,7 +532,12 @@ export class SiliconWorldEngine {
       this.heldKeys.clear();
       this.virtualMoveX = 0;
       this.virtualMoveY = 0;
+      gameAudio.setMusicMode('none');
     } else {
+      if (this.phase === 'TITLE') {
+        gameAudio.init();
+        gameAudio.setMusicMode('title');
+      }
       window.requestAnimationFrame(() => this.handleResize());
     }
   }
@@ -481,6 +566,9 @@ export class SiliconWorldEngine {
       this.virtualMoveX = 0;
       this.virtualMoveY = 0;
     }
+    if (nextPhase === 'TITLE' && this.arcadeActive) {
+      gameAudio.setMusicMode('title');
+    }
     this.emitHud();
   }
 
@@ -506,8 +594,8 @@ export class SiliconWorldEngine {
     this.inspectedPcIds.clear();
 
     this.buildSiliconCityMap(false);
-    this.player.wx = 9.5;
-    this.player.wy = 42.0;
+    this.player.wx = 6.5;
+    this.player.wy = 30.2;
     this.player.heroForm = 'pawn';
     this.player.hp = 100;
     this.player.battery = 90;
@@ -517,12 +605,21 @@ export class SiliconWorldEngine {
     this.player.hasNpuPulse = false;
     this.player.hasXessSurge = false;
     this.player.xessBuffTimer = 0;
+    this.weatherMix = {
+      TRAP_ALLEY: 1,
+      ECORE_PARK: 0,
+      COPPER_PLAZA: 0,
+      NPU_LIBRARY: 0,
+      ARC_ARENA: 0,
+      BOSS_COLOSSEUM: 0,
+      EXPO_PARK: 0,
+    };
 
     this.centerCameraInstant();
     this.phase = 'DIALOGUE';
     gameAudio.setMusicMode('trap');
-    this.objectiveText = 'Walk north to the Task Gate on Bargain Trap Island';
-    this.showBanner('ISLAND 1 · BARGAIN TRAP ALLEY (BLUE PAWN)', 2.8);
+    this.objectiveText = 'Push north to the Deadline Gate before battery dies';
+    this.showBanner('ACT I · 1:47 AM STUDY COVE', 2.8);
     this.callbacks.onStartDialogue('trap_intro');
     this.emitHud();
   }
@@ -615,15 +712,15 @@ export class SiliconWorldEngine {
     if (this.zone === 'SILICON_CITY' && !this.trapCompleted && effect.restoreBattery === 100) {
       this.trapCompleted = true;
       this.player.heroForm = 'warrior';
-      this.player.wx = 23.0;
-      this.player.wy = 39.5;
+      this.player.wx = 18.0;
+      this.player.wy = 28.0;
       this.spawnSpriteFx('healEffect', this.player.wx, this.player.wy, 160, 0.8);
       this.spawnSpriteFx('explosion2', this.player.wx, this.player.wy, 130, 0.55);
-      this.spawnSpriteFx('waterSplash', 18.5, 39.5, 110, 0.55);
-      this.spawnFloatingText(this.player.wx, this.player.wy - 0.8, 'UPGRADED: BLUE WARRIOR!', '#38BDF8');
+      this.spawnSpriteFx('waterSplash', 14.5, 28.0, 110, 0.55);
+      this.spawnFloatingText(this.player.wx, this.player.wy - 0.8, 'AWAKENED: BLUE KNIGHT!', '#38BDF8');
       gameAudio.playUnlock();
       gameAudio.setMusicMode('city');
-      this.showBanner('BLUE WARRIOR UNLOCKED · E-CORE EFFICIENCY PARK', 2.9);
+      this.showBanner('ACT II · HARBOR OF QUIET HOURS', 2.9);
     }
 
     this.emitHud();
@@ -631,15 +728,7 @@ export class SiliconWorldEngine {
 
   private openBossGate(): void {
     this.bossGateOpen = true;
-    for (let y = 0; y < this.mapH; y++) {
-      for (let x = 0; x < this.mapW; x++) {
-        if (this.map[y][x] === 9) {
-          this.map[y][x] = 3;
-        }
-      }
-    }
-    this.spawnSpriteFx('explosion2', 32.0, 16.5, 160, 0.65);
-    this.npcs = this.npcs.filter((n) => n.kind !== 'boss_gate');
+    this.spawnSpriteFx('explosion2', 23.5, 11.2, 160, 0.65);
   }
 
   private bindEvents(): void {
@@ -666,8 +755,9 @@ export class SiliconWorldEngine {
     const wy = ((sy - vh / 2) / this.camZoom + this.camY) / TILE_SIZE;
 
     for (const ip of this.intelProps) {
-      const hitW = ip.kind === 'booth' ? 1.55 : 0.95;
-      const hitH = ip.kind === 'booth' ? 1.45 : 1.05;
+      const isStall = ip.kind === 'booth' || ip.kind.startsWith('stall');
+      const hitW = isStall ? 1.55 : 0.95;
+      const hitH = isStall ? 1.45 : 1.05;
       if (Math.abs(wx - ip.wx) <= hitW && wy >= ip.wy - hitH && wy <= ip.wy + 0.55) {
         this.heldKeys.clear();
         this.phase = 'DIALOGUE';
@@ -749,57 +839,57 @@ export class SiliconWorldEngine {
 
   private buildSiliconCityMap(attractMode: boolean): void {
     this.zone = 'SILICON_CITY';
-    this.mapW = 64;
-    this.mapH = 48;
-    // Ocean water surrounds every island!
-    const m: GroundKind[][] = Array.from({ length: 48 }, () => Array<GroundKind>(64).fill(0));
+    this.mapW = 46;
+    this.mapH = 35;
+    // Compact, rich 46x35 island archipelago surrounded by ocean water
+    const m: GroundKind[][] = Array.from({ length: 35 }, () => Array<GroundKind>(46).fill(0));
 
     const fillRect = (x0: number, y0: number, x1: number, y1: number, kind: GroundKind) => {
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
-          if (y >= 0 && y < 48 && x >= 0 && x < 64) m[y][x] = kind;
+          if (y >= 0 && y < 35 && x >= 0 && x < 46) m[y][x] = kind;
         }
       }
     };
 
-    // Island 1: Bargain Trap Island (SW)
-    fillRect(3, 33, 17, 45, 1);
-    // Island 2: E-Core Efficiency Park (SE)
-    fillRect(20, 32, 44, 45, 2);
-    fillRect(29, 32, 34, 44, 3);
-    // Bridge: Trap -> E-Core
-    fillRect(17, 38, 20, 41, 3);
+    // Island 1: 1:47 AM Study Cove (SW) + paved exit lane
+    fillRect(2, 23, 13, 32, 1);
+    fillRect(7, 27, 13, 29, 3);
+    // Island 2: Harbor of Quiet Hours (SE) + paved avenues
+    fillRect(16, 23, 33, 32, 2);
+    fillRect(16, 27, 26, 29, 3);
+    fillRect(22, 20, 25, 31, 3); // Avenue & bridge north to Copper Plaza
+    // Bridge: Study Cove -> E-Core Harbor
+    fillRect(13, 27, 16, 29, 3);
     // Island 3: Copper Bus Plaza (Center)
-    fillRect(21, 17, 43, 31, 3);
-    // Island 4: NPU Offline Study Monastery (NW)
-    fillRect(3, 15, 19, 31, 4);
-    fillRect(19, 22, 21, 25, 3); // West bridge
-    // Island 5: Arc XeSS Archery Island (NE)
-    fillRect(45, 15, 60, 31, 5);
-    fillRect(43, 22, 45, 25, 3); // East bridge
-    // Island 6: Overclocked Colosseum (North)
-    fillRect(22, 3, 42, 15, 6);
-    fillRect(30, 15, 33, 17, 3); // North bridge
-    m[16][30] = 9;
-    m[16][31] = 9;
-    m[16][32] = 9;
-    m[16][33] = 9;
+    fillRect(16, 12, 31, 20, 3);
+    // Island 4: Library of Unspoken Notes (NW) + courtyard avenue
+    fillRect(2, 11, 13, 21, 4);
+    fillRect(6, 15, 16, 17, 3); // West bridge & paved lane
+    fillRect(6, 14, 10, 16, 3); // Monastery courtyard
+    // Island 5: Dawn Horizon Arena (NE) + range avenue
+    fillRect(34, 11, 44, 21, 5);
+    fillRect(31, 15, 40, 17, 3); // East bridge & paved lane
+    fillRect(37, 14, 40, 16, 3); // Archery plaza
+    // Island 6: The Burnout Citadel (North) + central causeway
+    fillRect(16, 2, 31, 10, 6);
+    fillRect(22, 6, 25, 12, 3); // North bridge & causeway
 
     this.map = m;
 
-    // Showcase ALL 5 Tiny Swords factions & building classes!
+    // All 5 Tiny Swords factions & building classes anchored tightly into each district
     this.buildings = [
-      { id: 'b_trap', name: 'GlitterBook RGB Shop', subtitle: '₹39,999 Bargain Trap', faction: 'Red', kind: 'barracks', tx: 4, ty: 34, tw: 4, th: 3, accent: '#EF4444' },
-      { id: 'b_trap_h', name: 'Red Sentry House', subtitle: 'Budget Bloatware', faction: 'Red', kind: 'house1', tx: 14, ty: 34, tw: 3, th: 2, accent: '#EF4444' },
-      { id: 'b_ecore', name: 'E-Core Blue Castle', subtitle: 'Hybrid Power Keep', faction: 'Blue', kind: 'castle', tx: 36, ty: 34, tw: 5, th: 3, accent: '#00C7FD' },
-      { id: 'b_ecore_h', name: 'Low-Power Cottage', subtitle: '20H Battery Hub', faction: 'Blue', kind: 'house2', tx: 22, ty: 34, tw: 3, th: 2, accent: '#10B981' },
-      { id: 'b_library', name: 'Offline Study Monastery', subtitle: '300+ Local AI Apps', faction: 'Purple', kind: 'monastery', tx: 4, ty: 16, tw: 4, th: 3, accent: '#A855F7' },
-      { id: 'b_npu_dome', name: 'NPU Blue Sanctuary', subtitle: 'Intel AI Boost Core', faction: 'Blue', kind: 'monastery', tx: 14, ty: 16, tw: 4, th: 3, accent: '#00C7FD' },
-      { id: 'b_arc_arcade', name: 'Arc XeSS Archery', subtitle: '120 FPS AI Upscaling', faction: 'Yellow', kind: 'archery', tx: 51, ty: 16, tw: 4, th: 3, accent: '#F59E0B' },
-      { id: 'b_arc_tower', name: 'XeSS Watchtower', subtitle: 'XMX Frame Engine', faction: 'Yellow', kind: 'tower', tx: 56, ty: 17, tw: 2, th: 3, accent: '#F59E0B' },
-      { id: 'b_boss_castle', name: 'Obsidian Lag Citadel', subtitle: 'Overclocked Boss Keep', faction: 'Black', kind: 'castle', tx: 29, ty: 3, tw: 6, th: 3, accent: '#94A3B8' },
-      { id: 'b_boss_tl', name: 'West Throttle Tower', subtitle: 'Thermal Barrier', faction: 'Black', kind: 'tower', tx: 23, ty: 4, tw: 2, th: 3, accent: '#EF4444' },
-      { id: 'b_boss_tr', name: 'East Throttle Tower', subtitle: 'Thermal Barrier', faction: 'Black', kind: 'tower', tx: 39, ty: 4, tw: 2, th: 3, accent: '#EF4444' },
+      { id: 'b_trap', name: 'GlitterBook RGB Shop', subtitle: '₹39,999 Bargain Trap', faction: 'Red', kind: 'barracks', tx: 3, ty: 24, tw: 4, th: 3, accent: '#EF4444' },
+      { id: 'b_trap_h', name: 'Red Sentry House', subtitle: 'Budget Bloatware', faction: 'Red', kind: 'house1', tx: 10, ty: 24, tw: 3, th: 2, accent: '#EF4444' },
+      { id: 'b_ecore_h', name: 'Low-Power Cottage', subtitle: '20H Battery Hub', faction: 'Blue', kind: 'house2', tx: 17, ty: 24, tw: 3, th: 2, accent: '#10B981' },
+      { id: 'b_ecore', name: 'E-Core Blue Castle', subtitle: 'Hybrid Power Keep', faction: 'Blue', kind: 'castle', tx: 27, ty: 24, tw: 5, th: 3, accent: '#00C7FD' },
+      { id: 'b_library', name: 'Offline Study Monastery', subtitle: '300+ Local AI Apps', faction: 'Purple', kind: 'monastery', tx: 3, ty: 12, tw: 4, th: 3, accent: '#A855F7' },
+      { id: 'b_npu_dome', name: 'NPU Blue Sanctuary', subtitle: 'Intel AI Boost Core', faction: 'Blue', kind: 'monastery', tx: 9, ty: 12, tw: 4, th: 3, accent: '#00C7FD' },
+      { id: 'b_arc_arcade', name: 'Arc XeSS Archery', subtitle: '120 FPS AI Upscaling', faction: 'Yellow', kind: 'archery', tx: 36, ty: 12, tw: 4, th: 3, accent: '#F59E0B' },
+      { id: 'b_arc_tower', name: 'XeSS Watchtower', subtitle: 'XMX Frame Engine', faction: 'Yellow', kind: 'tower', tx: 41, ty: 12, tw: 2, th: 3, accent: '#F59E0B' },
+      { id: 'b_boss_tl', name: 'West Throttle Tower', subtitle: 'Thermal Barrier', faction: 'Black', kind: 'tower', tx: 17, ty: 3, tw: 2, th: 3, accent: '#EF4444' },
+      { id: 'b_boss_castle', name: 'Obsidian Lag Citadel', subtitle: 'Overclocked Boss Keep', faction: 'Black', kind: 'castle', tx: 21, ty: 2, tw: 6, th: 3, accent: '#94A3B8' },
+      { id: 'b_boss_tr', name: 'East Throttle Tower', subtitle: 'Thermal Barrier', faction: 'Black', kind: 'tower', tx: 29, ty: 3, tw: 2, th: 3, accent: '#EF4444' },
     ];
 
     for (const b of this.buildings) {
@@ -810,187 +900,107 @@ export class SiliconWorldEngine {
       }
     }
 
-    // Organized Island Ecology: Structured Woodland Belts, Bridge Avenues & Courtyard Gardens
+    // Tightly framed, purposeful island trees, hedges & gold stones
     this.props = [
-      // Island 1: Bargain Trap Island — West cliff forest & sentry courtyard
-      { kind: 'tree', wx: 3.8, wy: 38.4, variant: 0 },
-      { kind: 'tree', wx: 3.8, wy: 41.2, variant: 2 },
-      { kind: 'tree', wx: 4.0, wy: 43.9, variant: 3 },
-      { kind: 'tree', wx: 6.4, wy: 44.3, variant: 1 },
-      { kind: 'tree', wx: 9.0, wy: 44.3, variant: 0 },
-      { kind: 'tree', wx: 11.8, wy: 44.3, variant: 2 },
-      { kind: 'tree', wx: 14.4, wy: 44.1, variant: 3 },
-      { kind: 'tree', wx: 16.3, wy: 43.4, variant: 1 },
-      { kind: 'tree', wx: 16.3, wy: 36.8, variant: 0 },
-      { kind: 'tree', wx: 11.0, wy: 34.0, variant: 3 },
-      { kind: 'stump', wx: 5.4, wy: 42.6, variant: 0 },
-      { kind: 'stump', wx: 15.2, wy: 42.4, variant: 1 },
-      { kind: 'bush', wx: 5.2, wy: 37.8, variant: 0 },
-      { kind: 'bush', wx: 15.0, wy: 37.8, variant: 2 },
-      { kind: 'rock', wx: 15.8, wy: 35.8, variant: 0 },
+      // Island 1: Study Cove
+      { kind: 'tree', wx: 2.8, wy: 28.0, variant: 0 },
+      { kind: 'tree', wx: 2.8, wy: 31.2, variant: 2 },
+      { kind: 'tree', wx: 9.8, wy: 31.4, variant: 1 },
+      { kind: 'tree', wx: 12.2, wy: 31.2, variant: 0 },
+      { kind: 'bush', wx: 4.5, wy: 27.6, variant: 0 },
+      { kind: 'bush', wx: 11.6, wy: 26.8, variant: 2 },
 
-      // Island 2: E-Core Park — Bridge avenue, Castle garden & SE Meadow Pasture
-      { kind: 'tree', wx: 21.0, wy: 33.6, variant: 0 },
-      { kind: 'tree', wx: 25.8, wy: 33.5, variant: 1 },
-      { kind: 'tree', wx: 28.0, wy: 34.0, variant: 2 },
-      { kind: 'tree', wx: 21.2, wy: 37.0, variant: 3 },
-      { kind: 'tree', wx: 21.2, wy: 42.4, variant: 1 },
-      { kind: 'tree', wx: 23.4, wy: 44.1, variant: 0 },
-      { kind: 'tree', wx: 25.8, wy: 44.2, variant: 2 },
-      { kind: 'tree', wx: 28.2, wy: 44.0, variant: 3 },
-      { kind: 'tree', wx: 35.4, wy: 33.4, variant: 0 },
-      { kind: 'tree', wx: 41.8, wy: 33.6, variant: 1 },
-      { kind: 'tree', wx: 42.8, wy: 36.2, variant: 2 },
-      { kind: 'tree', wx: 43.0, wy: 38.8, variant: 3 },
-      { kind: 'tree', wx: 43.0, wy: 41.4, variant: 0 },
-      { kind: 'tree', wx: 42.2, wy: 43.8, variant: 1 },
-      { kind: 'tree', wx: 39.8, wy: 44.1, variant: 2 },
-      { kind: 'tree', wx: 37.2, wy: 44.2, variant: 3 },
-      { kind: 'tree', wx: 35.0, wy: 44.0, variant: 0 },
-      // E-Core Castle courtyard bushes & mine clearing
-      { kind: 'bush', wx: 35.2, wy: 36.8, variant: 1 },
-      { kind: 'bush', wx: 41.4, wy: 37.4, variant: 3 },
-      { kind: 'bush', wx: 22.8, wy: 36.8, variant: 0 },
-      { kind: 'bush', wx: 26.2, wy: 42.6, variant: 2 },
-      { kind: 'bush', wx: 36.4, wy: 42.6, variant: 1 },
-      { kind: 'bush', wx: 40.6, wy: 42.4, variant: 3 },
-      { kind: 'stump', wx: 34.4, wy: 42.2, variant: 0 },
-      { kind: 'gold_stone', wx: 24.4, wy: 42.0, variant: 1 },
+      // Island 2: Harbor of Quiet Hours
+      { kind: 'tree', wx: 17.0, wy: 31.2, variant: 0 },
+      { kind: 'tree', wx: 20.4, wy: 31.3, variant: 2 },
+      { kind: 'tree', wx: 27.6, wy: 31.2, variant: 1 },
+      { kind: 'tree', wx: 32.0, wy: 31.0, variant: 3 },
+      { kind: 'tree', wx: 32.2, wy: 27.8, variant: 0 },
+      { kind: 'tree', wx: 21.0, wy: 24.4, variant: 1 },
+      { kind: 'tree', wx: 26.0, wy: 24.4, variant: 2 },
+      { kind: 'bush', wx: 18.6, wy: 26.8, variant: 0 },
+      { kind: 'bush', wx: 28.8, wy: 28.2, variant: 1 },
+      { kind: 'gold_stone', wx: 19.6, wy: 30.2, variant: 1 },
 
-      // Island 3: Copper Bus Plaza — Symmetrical Corner Groves & Avenue Framing
-      { kind: 'tree', wx: 22.0, wy: 18.2, variant: 1 },
-      { kind: 'tree', wx: 24.4, wy: 18.0, variant: 0 },
-      { kind: 'tree', wx: 26.8, wy: 18.2, variant: 3 },
-      { kind: 'tree', wx: 22.0, wy: 20.6, variant: 2 },
-      { kind: 'tree', wx: 42.0, wy: 18.2, variant: 2 },
-      { kind: 'tree', wx: 39.6, wy: 18.0, variant: 3 },
-      { kind: 'tree', wx: 37.2, wy: 18.2, variant: 0 },
-      { kind: 'tree', wx: 42.0, wy: 20.6, variant: 1 },
-      { kind: 'tree', wx: 22.0, wy: 27.6, variant: 3 },
-      { kind: 'tree', wx: 22.2, wy: 30.0, variant: 0 },
-      { kind: 'tree', wx: 24.6, wy: 30.2, variant: 1 },
-      { kind: 'tree', wx: 27.0, wy: 30.0, variant: 2 },
-      { kind: 'tree', wx: 42.0, wy: 27.6, variant: 0 },
-      { kind: 'tree', wx: 41.8, wy: 30.0, variant: 1 },
-      { kind: 'tree', wx: 39.4, wy: 30.2, variant: 2 },
-      { kind: 'tree', wx: 37.0, wy: 30.0, variant: 3 },
-      { kind: 'bush', wx: 23.6, wy: 19.6, variant: 1 },
-      { kind: 'bush', wx: 40.4, wy: 19.6, variant: 3 },
-      { kind: 'bush', wx: 23.6, wy: 28.6, variant: 0 },
-      { kind: 'bush', wx: 40.4, wy: 28.6, variant: 2 },
-      { kind: 'gold_stone', wx: 25.0, wy: 20.6, variant: 0 },
-      { kind: 'gold_stone', wx: 39.0, wy: 20.6, variant: 2 },
+      // Island 3: Copper Bus Plaza
+      { kind: 'tree', wx: 17.0, wy: 13.0, variant: 1 },
+      { kind: 'tree', wx: 30.0, wy: 13.0, variant: 2 },
+      { kind: 'tree', wx: 17.2, wy: 19.2, variant: 0 },
+      { kind: 'tree', wx: 29.8, wy: 19.2, variant: 3 },
+      { kind: 'bush', wx: 19.0, wy: 13.4, variant: 1 },
+      { kind: 'bush', wx: 28.0, wy: 13.4, variant: 3 },
+      { kind: 'gold_stone', wx: 19.6, wy: 19.2, variant: 0 },
+      { kind: 'gold_stone', wx: 27.4, wy: 19.2, variant: 2 },
 
-      // Island 4: NPU Study Monastery — Sanctuary Grove & Southern Gold Quarry
-      { kind: 'tree', wx: 9.2, wy: 16.4, variant: 0 },
-      { kind: 'tree', wx: 12.2, wy: 16.4, variant: 2 },
-      { kind: 'tree', wx: 18.2, wy: 17.6, variant: 1 },
-      { kind: 'tree', wx: 18.2, wy: 20.4, variant: 3 },
-      { kind: 'tree', wx: 3.8, wy: 20.8, variant: 1 },
-      { kind: 'tree', wx: 3.8, wy: 23.8, variant: 0 },
-      { kind: 'tree', wx: 3.8, wy: 26.8, variant: 2 },
-      { kind: 'tree', wx: 4.2, wy: 29.8, variant: 3 },
-      { kind: 'tree', wx: 6.6, wy: 30.2, variant: 0 },
-      { kind: 'tree', wx: 9.4, wy: 30.1, variant: 1 },
-      { kind: 'tree', wx: 12.2, wy: 30.2, variant: 2 },
-      { kind: 'tree', wx: 15.0, wy: 30.1, variant: 3 },
-      { kind: 'tree', wx: 17.8, wy: 29.8, variant: 0 },
-      { kind: 'tree', wx: 18.0, wy: 27.2, variant: 1 },
-      { kind: 'stump', wx: 5.6, wy: 21.8, variant: 0 },
-      { kind: 'bush', wx: 5.5, wy: 23.2, variant: 3 },
-      { kind: 'bush', wx: 16.5, wy: 21.8, variant: 1 },
-      { kind: 'gold_stone', wx: 13.4, wy: 28.8, variant: 4 },
+      // Island 4: Library of Unspoken Notes
+      { kind: 'tree', wx: 7.8, wy: 12.8, variant: 0 },
+      { kind: 'tree', wx: 2.8, wy: 17.4, variant: 1 },
+      { kind: 'tree', wx: 3.0, wy: 20.2, variant: 2 },
+      { kind: 'tree', wx: 6.4, wy: 20.4, variant: 0 },
+      { kind: 'tree', wx: 12.2, wy: 20.2, variant: 3 },
+      { kind: 'bush', wx: 3.6, wy: 15.6, variant: 3 },
+      { kind: 'gold_stone', wx: 9.0, wy: 19.8, variant: 4 },
 
-      // Island 5: Arc XeSS Archery — Perimeter Range Woods
-      { kind: 'tree', wx: 46.2, wy: 16.5, variant: 2 },
-      { kind: 'tree', wx: 48.8, wy: 16.5, variant: 0 },
-      { kind: 'tree', wx: 46.2, wy: 19.6, variant: 3 },
-      { kind: 'tree', wx: 59.0, wy: 16.8, variant: 1 },
-      { kind: 'tree', wx: 59.2, wy: 20.0, variant: 0 },
-      { kind: 'tree', wx: 59.2, wy: 23.2, variant: 2 },
-      { kind: 'tree', wx: 59.0, wy: 26.4, variant: 3 },
-      { kind: 'tree', wx: 58.8, wy: 29.8, variant: 1 },
-      { kind: 'tree', wx: 56.0, wy: 30.1, variant: 0 },
-      { kind: 'tree', wx: 52.8, wy: 30.1, variant: 2 },
-      { kind: 'tree', wx: 49.6, wy: 30.2, variant: 3 },
-      { kind: 'tree', wx: 46.5, wy: 29.8, variant: 1 },
-      { kind: 'tree', wx: 46.2, wy: 27.2, variant: 0 },
-      { kind: 'stump', wx: 55.6, wy: 21.2, variant: 1 },
-      { kind: 'bush', wx: 48.0, wy: 20.5, variant: 0 },
-      { kind: 'bush', wx: 57.5, wy: 28.0, variant: 2 },
-      { kind: 'gold_stone', wx: 47.6, wy: 28.6, variant: 5 },
+      // Island 5: Dawn Horizon Arena
+      { kind: 'tree', wx: 35.0, wy: 12.8, variant: 2 },
+      { kind: 'tree', wx: 43.2, wy: 15.4, variant: 0 },
+      { kind: 'tree', wx: 43.0, wy: 19.8, variant: 1 },
+      { kind: 'tree', wx: 35.2, wy: 20.2, variant: 3 },
+      { kind: 'bush', wx: 34.8, wy: 17.8, variant: 0 },
+      { kind: 'gold_stone', wx: 41.4, wy: 20.0, variant: 5 },
 
-      // Island 6: Overclocked Colosseum — Symmetrical Fortress Sentinels
-      { kind: 'tree', wx: 22.8, wy: 8.4, variant: 3 },
-      { kind: 'tree', wx: 22.8, wy: 11.4, variant: 2 },
-      { kind: 'tree', wx: 23.6, wy: 13.8, variant: 0 },
-      { kind: 'tree', wx: 26.4, wy: 14.0, variant: 1 },
-      { kind: 'tree', wx: 41.2, wy: 8.4, variant: 2 },
-      { kind: 'tree', wx: 41.2, wy: 11.4, variant: 3 },
-      { kind: 'tree', wx: 40.4, wy: 13.8, variant: 1 },
-      { kind: 'tree', wx: 37.6, wy: 14.0, variant: 0 },
-      { kind: 'rock', wx: 24.8, wy: 12.6, variant: 1 },
-      { kind: 'rock', wx: 39.2, wy: 12.6, variant: 2 },
+      // Island 6: Obsidian Colosseum
+      { kind: 'tree', wx: 16.8, wy: 7.4, variant: 3 },
+      { kind: 'tree', wx: 17.2, wy: 9.4, variant: 2 },
+      { kind: 'tree', wx: 30.2, wy: 7.4, variant: 2 },
+      { kind: 'tree', wx: 29.8, wy: 9.4, variant: 3 },
     ];
 
     const denseFill: PropItem[] = [
-      // Bridge Framing Avenues & Building Flanking Gardens (curated positions)
-      { kind: 'tree', wx: 23.2, wy: 37.2, variant: 2 },
-      { kind: 'tree', wx: 23.2, wy: 41.4, variant: 0 },
-      { kind: 'tree', wx: 40.6, wy: 39.2, variant: 2 },
-      { kind: 'tree', wx: 5.4, wy: 28.2, variant: 2 },
-      { kind: 'tree', wx: 8.2, wy: 28.6, variant: 0 },
-      { kind: 'tree', wx: 55.2, wy: 28.6, variant: 0 },
-      { kind: 'tree', wx: 57.6, wy: 26.8, variant: 2 },
-      { kind: 'bush', wx: 28.2, wy: 19.2, variant: 2 },
-      { kind: 'bush', wx: 35.8, wy: 19.2, variant: 0 },
-      { kind: 'bush', wx: 28.2, wy: 29.4, variant: 3 },
-      { kind: 'bush', wx: 35.8, wy: 29.4, variant: 1 },
+      { kind: 'bush', wx: 21.4, wy: 14.0, variant: 2 },
+      { kind: 'bush', wx: 25.6, wy: 14.0, variant: 0 },
     ];
 
-    // Interactive Intel AI PC Hardware Landmarks across Silicon City!
+    // Interactive Intel AI PC Hardware Landmarks across compact Silicon City
     this.intelProps = [
-      { id: 'hw_trap', hardwareKey: 'trap_glitterbook', kind: 'trapLaptop', wx: 8.2, wy: 36.6, label: 'GLITTERBOOK · NO NPU [E]', accent: '#EF4444' },
-      { id: 'hw_ecore_booth', hardwareKey: 'ecore_booth', kind: 'booth', wx: 32.0, wy: 35.8, label: 'INTEL AI PC PAVILION [E]', accent: '#00C7FD' },
-      { id: 'hw_ecore_chip', hardwareKey: 'core_ultra_battery', kind: 'chip', wx: 27.0, wy: 39.2, label: 'CORE ULTRA · 20H+ [E]', accent: '#10B981' },
-      { id: 'hw_plaza_hub', hardwareKey: 'core_ultra_hub', kind: 'chip', wx: 32.0, wy: 24.0, label: 'CORE ULTRA 3-ENGINE [E]', accent: '#00C7FD' },
-      { id: 'hw_plaza_apps', hardwareKey: 'ai_pc_apps', kind: 'aiPc', wx: 28.6, wy: 24.0, label: 'AI PC · 300+ APPS [E]', accent: '#38BDF8' },
-      { id: 'hw_plaza_xess', hardwareKey: 'ai_pc_xess', kind: 'aiPc', wx: 35.4, wy: 24.0, label: 'ARC XeSS GAMING [E]', accent: '#F59E0B' },
-      { id: 'hw_npu_chip', hardwareKey: 'npu_ai_boost', kind: 'chip', wx: 9.2, wy: 20.0, label: 'INTEL AI BOOST NPU [E]', accent: '#A855F7' },
-      { id: 'hw_arc_rig', hardwareKey: 'arc_xess_rig', kind: 'aiPc', wx: 53.8, wy: 20.2, label: 'XeSS 120 FPS RIG [E]', accent: '#F59E0B' },
+      { id: 'hw_trap', hardwareKey: 'trap_glitterbook', kind: 'trapLaptop', wx: 8.4, wy: 26.2, label: 'GLITTERBOOK · NO NPU [E]', accent: '#EF4444' },
+      { id: 'hw_ecore_booth', hardwareKey: 'ecore_booth', kind: 'booth', wx: 23.5, wy: 25.2, label: 'INTEL AI PC PAVILION [E]', accent: '#00C7FD' },
+      { id: 'hw_ecore_chip', hardwareKey: 'core_ultra_battery', kind: 'chip', wx: 20.5, wy: 28.0, label: 'CORE ULTRA · 20H+ [E]', accent: '#10B981' },
+      { id: 'hw_plaza_hub', hardwareKey: 'core_ultra_hub', kind: 'chip', wx: 23.5, wy: 16.0, label: 'CORE ULTRA 3-ENGINE [E]', accent: '#00C7FD' },
+      { id: 'hw_plaza_apps', hardwareKey: 'ai_pc_apps', kind: 'aiPc', wx: 20.4, wy: 16.0, label: 'AI PC · 300+ APPS [E]', accent: '#38BDF8' },
+      { id: 'hw_plaza_xess', hardwareKey: 'ai_pc_xess', kind: 'aiPc', wx: 26.6, wy: 16.0, label: 'ARC XeSS GAMING [E]', accent: '#F59E0B' },
+      { id: 'hw_npu_chip', hardwareKey: 'npu_ai_boost', kind: 'chip', wx: 5.5, wy: 15.8, label: 'INTEL AI BOOST NPU [E]', accent: '#A855F7' },
+      { id: 'hw_arc_rig', hardwareKey: 'arc_xess_rig', kind: 'aiPc', wx: 40.5, wy: 15.5, label: 'XeSS 120 FPS RIG [E]', accent: '#F59E0B' },
     ];
 
-    // Water Rocks & Rubber Ducks in the surrounding ocean!
+    // Water Rocks & Rubber Ducks in surrounding channels
     this.waterDecos = [
-      { kind: 'duck', wx: 18.5, wy: 35.5, variant: 0, phase: 0.4 },
-      { kind: 'duck', wx: 19.5, wy: 27.5, variant: 0, phase: 1.9 },
-      { kind: 'duck', wx: 44.2, wy: 28.2, variant: 0, phase: 2.7 },
-      { kind: 'duck', wx: 28.0, wy: 16.0, variant: 0, phase: 0.9 },
-      { kind: 'duck', wx: 14.0, wy: 32.2, variant: 0, phase: 1.4 },
-      { kind: 'duck', wx: 48.0, wy: 34.0, variant: 0, phase: 2.2 },
-      { kind: 'water_rock', wx: 18.5, wy: 43.2, variant: 0, phase: 0 },
-      { kind: 'water_rock', wx: 20.0, wy: 19.2, variant: 1, phase: 1.2 },
-      { kind: 'water_rock', wx: 44.0, wy: 18.8, variant: 2, phase: 2.1 },
-      { kind: 'water_rock', wx: 35.5, wy: 16.0, variant: 3, phase: 0.7 },
-      { kind: 'water_rock', wx: 11.5, wy: 32.0, variant: 1, phase: 1.5 },
-      { kind: 'water_rock', wx: 52.0, wy: 32.5, variant: 2, phase: 2.8 },
+      { kind: 'duck', wx: 14.5, wy: 25.0, variant: 0, phase: 0.4 },
+      { kind: 'duck', wx: 14.5, wy: 19.2, variant: 0, phase: 1.9 },
+      { kind: 'duck', wx: 32.5, wy: 19.4, variant: 0, phase: 2.7 },
+      { kind: 'duck', wx: 19.5, wy: 11.2, variant: 0, phase: 0.9 },
+      { kind: 'duck', wx: 9.0, wy: 22.0, variant: 0, phase: 1.4 },
+      { kind: 'duck', wx: 37.0, wy: 22.4, variant: 0, phase: 2.2 },
+      { kind: 'water_rock', wx: 14.5, wy: 31.2, variant: 0, phase: 0 },
+      { kind: 'water_rock', wx: 14.5, wy: 12.8, variant: 1, phase: 1.2 },
+      { kind: 'water_rock', wx: 32.5, wy: 12.6, variant: 2, phase: 2.1 },
+      { kind: 'water_rock', wx: 27.6, wy: 11.2, variant: 3, phase: 0.7 },
+      { kind: 'water_rock', wx: 5.0, wy: 22.0, variant: 1, phase: 1.5 },
+      { kind: 'water_rock', wx: 40.5, wy: 22.4, variant: 2, phase: 2.8 },
     ];
 
     const mkSheep = (wx: number, wy: number, wps: { wx: number; wy: number }[], state: 'IDLE' | 'GRASS' | 'MOVE' = 'GRASS'): SheepEntity => ({
       wx, wy, vx: 0, vy: 0, state, timer: 1.6, pauseTimer: 0, flipCooldown: 0, flipX: false, waypoints: wps, wpIdx: 0,
     });
 
-    // Pasture Sheep with calm grazing waypoints inside island meadows
     this.sheep = [
-      mkSheep(37.6, 40.6, [{ wx: 37.6, wy: 40.6 }, { wx: 39.2, wy: 40.8 }, { wx: 38.5, wy: 42.0 }], 'GRASS'),
-      mkSheep(39.4, 41.8, [{ wx: 39.4, wy: 41.8 }, { wx: 37.2, wy: 41.8 }, { wx: 38.2, wy: 40.2 }], 'IDLE'),
-      mkSheep(25.2, 41.2, [{ wx: 25.2, wy: 41.2 }, { wx: 27.0, wy: 41.5 }, { wx: 26.2, wy: 40.0 }], 'MOVE'),
-      mkSheep(28.0, 41.8, [{ wx: 28.0, wy: 41.8 }, { wx: 26.4, wy: 42.2 }, { wx: 27.6, wy: 40.5 }], 'GRASS'),
-      mkSheep(6.6, 23.0, [{ wx: 6.6, wy: 23.0 }, { wx: 8.2, wy: 23.4 }, { wx: 7.4, wy: 22.0 }], 'GRASS'),
-      mkSheep(13.2, 26.4, [{ wx: 13.2, wy: 26.4 }, { wx: 15.0, wy: 26.4 }, { wx: 14.0, wy: 27.4 }], 'IDLE'),
-      mkSheep(26.6, 21.8, [{ wx: 26.6, wy: 21.8 }, { wx: 28.0, wy: 21.8 }, { wx: 27.2, wy: 22.6 }], 'GRASS'),
-      mkSheep(37.4, 21.8, [{ wx: 37.4, wy: 21.8 }, { wx: 36.0, wy: 21.8 }, { wx: 36.8, wy: 22.6 }], 'MOVE'),
-      mkSheep(54.8, 26.6, [{ wx: 54.8, wy: 26.6 }, { wx: 56.2, wy: 26.6 }, { wx: 55.4, wy: 27.6 }], 'GRASS'),
+      mkSheep(28.5, 29.5, [{ wx: 28.5, wy: 29.5 }, { wx: 30.2, wy: 29.8 }, { wx: 29.4, wy: 30.6 }], 'GRASS'),
+      mkSheep(30.6, 30.2, [{ wx: 30.6, wy: 30.2 }, { wx: 28.4, wy: 30.4 }, { wx: 29.6, wy: 29.2 }], 'IDLE'),
+      mkSheep(18.2, 29.4, [{ wx: 18.2, wy: 29.4 }, { wx: 20.6, wy: 29.6 }, { wx: 19.4, wy: 28.8 }], 'MOVE'),
+      mkSheep(4.8, 18.0, [{ wx: 4.8, wy: 18.0 }, { wx: 6.2, wy: 18.4 }, { wx: 5.4, wy: 17.2 }], 'GRASS'),
+      mkSheep(18.8, 14.8, [{ wx: 18.8, wy: 14.8 }, { wx: 20.2, wy: 14.8 }, { wx: 19.5, wy: 15.4 }], 'GRASS'),
+      mkSheep(28.0, 14.8, [{ wx: 28.0, wy: 14.8 }, { wx: 26.8, wy: 14.8 }, { wx: 27.4, wy: 15.4 }], 'MOVE'),
+      mkSheep(38.6, 18.4, [{ wx: 38.6, wy: 18.4 }, { wx: 40.0, wy: 18.4 }, { wx: 39.2, wy: 19.4 }], 'GRASS'),
     ];
 
     const mkVillager = (
@@ -1005,70 +1015,58 @@ export class SiliconWorldEngine {
       id, faction, role, wx, wy, vx: 0, vy: 0, state, timer: 1.5, pauseTimer: 0, flipCooldown: 0, flipX: false, waypoints: wps, wpIdx: 0,
     });
 
-    // Living Multi-Faction Citizens with Purposeful Work & Patrol Routes!
     this.villagers = [
-      // Bargain Trap Island: Red workers patrolling between Sentry House and Barracks
-      mkVillager(1, 'Red', 'pawn', 6.4, 39.2, [{ wx: 6.4, wy: 39.2 }, { wx: 9.8, wy: 39.2 }, { wx: 9.8, wy: 41.0 }, { wx: 6.4, wy: 41.0 }], 'ACTION'),
-      mkVillager(2, 'Red', 'pawn_gold', 14.4, 38.2, [{ wx: 14.4, wy: 38.2 }, { wx: 11.4, wy: 38.2 }, { wx: 14.4, wy: 40.4 }], 'MOVE'),
-
-      // E-Core Park: Blue Pawns hauling gold between Mine & Castle, Monk tending Cottage courtyard
-      mkVillager(3, 'Blue', 'pawn_gold', 24.4, 40.4, [{ wx: 24.4, wy: 40.4 }, { wx: 35.8, wy: 38.6 }, { wx: 35.8, wy: 37.6 }, { wx: 26.0, wy: 38.2 }], 'MOVE'),
-      mkVillager(4, 'Blue', 'pawn', 36.8, 38.0, [{ wx: 36.8, wy: 38.0 }, { wx: 39.6, wy: 38.0 }, { wx: 38.2, wy: 39.6 }], 'ACTION'),
-      mkVillager(5, 'Blue', 'monk', 23.6, 36.6, [{ wx: 23.6, wy: 36.6 }, { wx: 26.2, wy: 36.6 }], 'ACTION'),
-      mkVillager(6, 'Blue', 'pawn_gold', 30.5, 38.8, [{ wx: 30.5, wy: 38.8 }, { wx: 33.5, wy: 38.8 }, { wx: 32.0, wy: 41.0 }], 'MOVE'),
-
-      // Copper Plaza: Cross-faction stewards patrolling the 3-Engine Hub
-      mkVillager(7, 'Blue', 'pawn', 27.6, 26.2, [{ wx: 27.6, wy: 26.2 }, { wx: 36.4, wy: 26.2 }, { wx: 36.4, wy: 22.0 }, { wx: 27.6, wy: 22.0 }], 'MOVE'),
-      mkVillager(8, 'Yellow', 'lancer', 35.2, 22.4, [{ wx: 35.2, wy: 22.4 }, { wx: 28.8, wy: 22.4 }], 'IDLE'),
-
-      // NPU Monastery Island: Monks tending shrines & Purple Pawn hauling from Gold Quarry
-      mkVillager(9, 'Purple', 'monk', 7.4, 20.4, [{ wx: 7.4, wy: 20.4 }, { wx: 10.6, wy: 20.4 }], 'ACTION'),
-      mkVillager(10, 'Purple', 'monk', 15.8, 20.6, [{ wx: 15.8, wy: 20.6 }, { wx: 15.8, wy: 23.4 }], 'ACTION'),
-      mkVillager(11, 'Purple', 'pawn_gold', 13.0, 27.4, [{ wx: 13.0, wy: 27.4 }, { wx: 6.8, wy: 20.6 }, { wx: 11.4, wy: 24.4 }], 'MOVE'),
-
-      // Arc Archery Island: Yellow Archers patrolling the firing range & worker hauling
-      mkVillager(12, 'Yellow', 'archer', 49.4, 21.8, [{ wx: 49.4, wy: 21.8 }, { wx: 56.4, wy: 21.8 }], 'MOVE'),
-      mkVillager(13, 'Yellow', 'archer', 56.4, 25.4, [{ wx: 56.4, wy: 25.4 }, { wx: 49.6, wy: 25.4 }], 'IDLE'),
-      mkVillager(14, 'Yellow', 'pawn_gold', 48.2, 27.4, [{ wx: 48.2, wy: 27.4 }, { wx: 52.8, wy: 20.8 }], 'MOVE'),
+      mkVillager(1, 'Red', 'pawn', 5.4, 28.2, [{ wx: 5.4, wy: 28.2 }, { wx: 8.8, wy: 28.2 }, { wx: 8.8, wy: 29.8 }, { wx: 5.4, wy: 29.8 }], 'ACTION'),
+      mkVillager(2, 'Red', 'pawn_gold', 11.4, 27.2, [{ wx: 11.4, wy: 27.2 }, { wx: 9.2, wy: 27.2 }, { wx: 11.4, wy: 29.0 }], 'MOVE'),
+      mkVillager(3, 'Blue', 'pawn_gold', 18.4, 29.4, [{ wx: 18.4, wy: 29.4 }, { wx: 25.8, wy: 28.4 }, { wx: 25.8, wy: 27.2 }, { wx: 21.0, wy: 27.8 }], 'MOVE'),
+      mkVillager(4, 'Blue', 'pawn', 27.5, 27.6, [{ wx: 27.5, wy: 27.6 }, { wx: 30.5, wy: 27.6 }, { wx: 29.0, wy: 29.0 }], 'ACTION'),
+      mkVillager(5, 'Blue', 'monk', 17.8, 26.4, [{ wx: 17.8, wy: 26.4 }, { wx: 20.6, wy: 26.4 }], 'ACTION'),
+      mkVillager(6, 'Blue', 'pawn_gold', 22.8, 28.4, [{ wx: 22.8, wy: 28.4 }, { wx: 25.2, wy: 28.4 }, { wx: 24.0, wy: 30.2 }], 'MOVE'),
+      mkVillager(7, 'Blue', 'pawn', 19.6, 17.2, [{ wx: 19.6, wy: 17.2 }, { wx: 27.4, wy: 17.2 }, { wx: 27.4, wy: 14.8 }, { wx: 19.6, wy: 14.8 }], 'MOVE'),
+      mkVillager(8, 'Yellow', 'lancer', 26.4, 14.8, [{ wx: 26.4, wy: 14.8 }, { wx: 20.8, wy: 14.8 }], 'IDLE'),
+      mkVillager(9, 'Purple', 'monk', 4.6, 15.2, [{ wx: 4.6, wy: 15.2 }, { wx: 7.2, wy: 15.2 }], 'ACTION'),
+      mkVillager(10, 'Purple', 'monk', 11.2, 15.6, [{ wx: 11.2, wy: 15.6 }, { wx: 11.2, wy: 17.8 }], 'ACTION'),
+      mkVillager(11, 'Purple', 'pawn_gold', 8.6, 18.8, [{ wx: 8.6, wy: 18.8 }, { wx: 4.8, wy: 15.8 }, { wx: 8.0, wy: 17.2 }], 'MOVE'),
+      mkVillager(12, 'Yellow', 'archer', 36.2, 15.6, [{ wx: 36.2, wy: 15.6 }, { wx: 42.0, wy: 15.6 }], 'MOVE'),
+      mkVillager(13, 'Yellow', 'archer', 42.0, 18.2, [{ wx: 42.0, wy: 18.2 }, { wx: 36.4, wy: 18.2 }], 'IDLE'),
+      mkVillager(14, 'Yellow', 'pawn_gold', 37.4, 19.4, [{ wx: 37.4, wy: 19.4 }, { wx: 39.8, wy: 15.6 }], 'MOVE'),
     ];
 
     this.signposts = [
-      { wx: 24.5, wy: 24.0, label: '← NPU STUDY MONASTERY', color: '#00C7FD' },
-      { wx: 39.5, wy: 24.0, label: 'ARC XeSS ARCHERY →', color: '#F59E0B' },
-      { wx: 32.0, wy: 18.2, label: '▲ BLACK COLOSSEUM (BOSS)', color: '#EF4444' },
+      { wx: 17.8, wy: 16.0, label: '← LIBRARY OF UNSPOKEN NOTES', color: '#00C7FD' },
+      { wx: 29.2, wy: 16.0, label: 'DAWN HORIZON ARENA →', color: '#F59E0B' },
+      { wx: 23.5, wy: 13.2, label: '▲ THE BURNOUT CITADEL', color: '#EF4444' },
     ];
 
     this.npcs = [
-      { id: 'trap_gate', name: 'Overloaded Task Gate', kind: 'trap_gate', wx: 12.5, wy: 35.5, dialogueId: 'trap_meltdown', interacted: false },
-      { id: 'npc_ecore', name: 'E-Core Steward', kind: 'ecore', wx: 34.5, wy: 38.2, dialogueId: 'ecore_greeting', interacted: false },
-      { id: 'npc_npu', name: 'NPU Monk Sentinel', kind: 'npu', wx: 11.5, wy: 21.5, dialogueId: 'npu_intro', interacted: false },
-      { id: 'npc_arc', name: 'Arc Archer Warden', kind: 'arc', wx: 51.5, wy: 21.5, dialogueId: 'arc_intro', interacted: false },
-      { id: 'npc_boss_gate', name: 'Colosseum Bridge Gate', kind: 'boss_gate', wx: 32.0, wy: 16.5, dialogueId: '', interacted: false },
+      { id: 'npc_ecore', name: 'Harbor Steward', kind: 'ecore', wx: 25.2, wy: 27.5, dialogueId: 'ecore_greeting', interacted: false },
+      { id: 'npc_npu', name: 'Keeper of Quiet Notes', kind: 'npu', wx: 8.0, wy: 15.8, dialogueId: 'npu_intro', interacted: false },
+      { id: 'npc_arc', name: 'Horizon Captain', kind: 'arc', wx: 38.0, wy: 15.8, dialogueId: 'arc_intro', interacted: false },
     ];
 
     this.tasks = [
-      { id: 'task_study', label: 'Offline Lecture AI', wx: 7.5, wy: 25.5, rescued: false, variant: 0 },
-      { id: 'task_privacy', label: 'Private PDF Tutor', wx: 15.5, wy: 27.5, rescued: false, variant: 1 },
-      { id: 'task_xess', label: 'Esports 120 FPS Rig', wx: 49.0, wy: 27.5, rescued: false, variant: 2 },
-      { id: 'task_stream', label: 'Creator Stream Deck', wx: 56.5, wy: 23.5, rescued: false, variant: 3 },
+      { id: 'task_study', label: 'Final Thesis Draft', wx: 5.0, wy: 18.5, rescued: false, variant: 0 },
+      { id: 'task_privacy', label: 'Quiet Train Notes', wx: 10.8, wy: 19.2, rescued: false, variant: 1 },
+      { id: 'task_xess', label: 'Friday Squad Match', wx: 36.5, wy: 19.2, rescued: false, variant: 2 },
+      { id: 'task_stream', label: '4K Club Reel Cut', wx: 41.8, wy: 18.0, rescued: false, variant: 3 },
     ];
 
-    // Red Units in early zones, Purple & Black Units on northern approaches!
+    // Progressive per-island enemy scaling (Tier 1 West -> Tier 2 Plaza -> Tier 3 East -> Tier 4 Citadel)
     this.enemies = [
-      this.makeEnemy('red_pawn', 10.5, 25.5),
-      this.makeEnemy('red_archer', 14.5, 24.5),
-      this.makeEnemy('red_warrior', 27.5, 26.5),
-      this.makeEnemy('red_warrior', 36.5, 26.5),
-      this.makeEnemy('purple_lancer', 51.0, 26.5),
-      this.makeEnemy('black_archer', 55.0, 24.0),
-      this.makeEnemy('black_warrior', 47.5, 23.5),
+      this.makeEnemy('red_pawn', 7.5, 18.5, 1),
+      this.makeEnemy('red_archer', 10.5, 17.6, 1),
+      this.makeEnemy('red_warrior', 20.2, 18.4, 2),
+      this.makeEnemy('red_warrior', 26.8, 18.4, 2),
+      this.makeEnemy('black_warrior', 35.8, 17.5, 3),
+      this.makeEnemy('purple_lancer', 38.5, 19.2, 3),
+      this.makeEnemy('black_archer', 41.5, 16.8, 3),
     ];
 
     this.pickups = [
-      { id: this.nextEntityId++, kind: 'meat', wx: 26.0, wy: 38.5, bobOffset: 0 },
-      { id: this.nextEntityId++, kind: 'gold', wx: 8.5, wy: 22.5, bobOffset: 1.1 },
-      { id: this.nextEntityId++, kind: 'wood', wx: 32.0, wy: 27.5, bobOffset: 2.0 },
-      { id: this.nextEntityId++, kind: 'gold', wx: 53.5, wy: 27.5, bobOffset: 2.7 },
+      { id: this.nextEntityId++, kind: 'meat', wx: 19.5, wy: 26.5, bobOffset: 0 },
+      { id: this.nextEntityId++, kind: 'gold', wx: 4.8, wy: 16.8, bobOffset: 1.1 },
+      { id: this.nextEntityId++, kind: 'wood', wx: 23.5, wy: 18.8, bobOffset: 2.0 },
+      { id: this.nextEntityId++, kind: 'gold', wx: 40.0, wy: 19.4, bobOffset: 2.7 },
     ];
 
     this.projectiles = [];
@@ -1077,52 +1075,65 @@ export class SiliconWorldEngine {
     this.spriteVfx = [];
     this.particles = [];
     this.floatingTexts = [];
+    this.stormIntensity = 0;
+    this.lightningTimer = 3.2;
+    this.lightningFlash = 0;
     this.boss = {
       active: false,
-      wx: 32,
-      wy: 9.2,
-      hp: 360,
-      maxHp: 360,
-      shield: 70,
-      maxShield: 70,
+      wx: 23.5,
+      wy: 6.4,
+      hp: 380,
+      maxHp: 380,
+      shield: 75,
+      maxShield: 75,
       phase: 1,
+      splitActive: false,
       state: 'IDLE',
       stateTimer: 1.2,
       hitFlash: 0,
       attackCombo: 0,
       towerTimer: 2.8,
-      decoys: [],
+      portalCooldown: 5.5,
+      portals: [],
+      twins: [],
     };
     this.bossGateOpen = attractMode;
     this.addSafeProps(denseFill);
     if (attractMode) {
       this.player.heroForm = 'warrior';
-      this.player.wx = 32;
-      this.player.wy = 26;
+      this.player.wx = 23.5;
+      this.player.wy = 17.5;
     }
   }
 
   private buildExpoParkMap(): void {
     this.zone = 'EXPO_PARK';
-    this.mapW = 36;
-    this.mapH = 28;
-    const m: GroundKind[][] = Array.from({ length: 28 }, () => Array<GroundKind>(36).fill(0));
+    this.mapW = 28;
+    this.mapH = 22;
+    const m: GroundKind[][] = Array.from({ length: 22 }, () => Array<GroundKind>(28).fill(0));
 
-    for (let y = 2; y <= 25; y++) {
-      for (let x = 2; x <= 33; x++) {
-        if (x >= 7 && x <= 28 && y >= 6 && y <= 21) m[y][x] = 7;
+    // Compact, sunlit festival courtyard island surrounded by vibrant garden borders
+    for (let y = 2; y <= 19; y++) {
+      for (let x = 2; x <= 25; x++) {
+        if (x >= 6 && x <= 21 && y >= 5 && y <= 17) m[y][x] = 7;
         else m[y][x] = 2;
+      }
+    }
+    // Southern arrival avenue stone runner
+    for (let y = 17; y <= 19; y++) {
+      for (let x = 12; x <= 15; x++) {
+        m[y][x] = 7;
       }
     }
 
     this.map = m;
-    // 5 Expo Park Booths using all 5 Tiny Swords factions!
+    // 5 Clustered U-Shaped Intel Pavilions framing the central Core Ultra Wafer Plaza!
     this.buildings = [
-      { id: 'ex_1', name: 'Blue Keep · Ultra 5', subtitle: 'Campus Dash', faction: 'Blue', kind: 'castle', tx: 6, ty: 5, tw: 5, th: 3, accent: '#00C7FD' },
-      { id: 'ex_2', name: 'Yellow Guild · Ultra 7', subtitle: 'FlowCraft Pro', faction: 'Yellow', kind: 'monastery', tx: 16, ty: 4, tw: 4, th: 3, accent: '#F59E0B' },
-      { id: 'ex_3', name: 'Red Arena · Ultra 9', subtitle: 'Apex Frame', faction: 'Red', kind: 'archery', tx: 25, ty: 5, tw: 4, th: 3, accent: '#EF4444' },
-      { id: 'ex_4', name: 'Purple Abbey · Ultra 5', subtitle: 'FeatherAir', faction: 'Purple', kind: 'house1', tx: 9, ty: 14, tw: 3, th: 2, accent: '#A855F7' },
-      { id: 'ex_5', name: 'Black Forge · Ultra 7', subtitle: 'Canvas Studio', faction: 'Black', kind: 'barracks', tx: 23, ty: 14, tw: 4, th: 3, accent: '#94A3B8' },
+      { id: 'ex_1', name: 'Blue Keep · Ultra 5', subtitle: 'Campus Dash', faction: 'Blue', kind: 'castle', tx: 4, ty: 3, tw: 4, th: 3, accent: '#00C7FD' },
+      { id: 'ex_2', name: 'Yellow Guild · Ultra 7', subtitle: 'FlowCraft Pro', faction: 'Yellow', kind: 'monastery', tx: 12, ty: 2, tw: 4, th: 3, accent: '#F59E0B' },
+      { id: 'ex_3', name: 'Red Arena · Ultra 9', subtitle: 'Apex Frame', faction: 'Red', kind: 'archery', tx: 20, ty: 3, tw: 4, th: 3, accent: '#EF4444' },
+      { id: 'ex_4', name: 'Purple Abbey · Ultra 5', subtitle: 'FeatherAir', faction: 'Purple', kind: 'house1', tx: 4, ty: 12, tw: 3, th: 2, accent: '#A855F7' },
+      { id: 'ex_5', name: 'Black Forge · Ultra 7', subtitle: 'Canvas Studio', faction: 'Black', kind: 'barracks', tx: 20, ty: 12, tw: 4, th: 3, accent: '#94A3B8' },
     ];
     for (const b of this.buildings) {
       for (let y = b.ty; y < b.ty + b.th; y++) {
@@ -1132,65 +1143,44 @@ export class SiliconWorldEngine {
       }
     }
 
-    // Expo Park Organized Woodland Border & Courtyard Symmetry
+    // Symmetrical Festival Garden Perimeter (compact, lush, uncluttered)
     this.props = [
-      { kind: 'tree', wx: 3.5, wy: 4.2, variant: 0 },
-      { kind: 'tree', wx: 3.5, wy: 7.4, variant: 2 },
-      { kind: 'tree', wx: 3.5, wy: 10.6, variant: 1 },
-      { kind: 'tree', wx: 3.5, wy: 13.8, variant: 3 },
-      { kind: 'tree', wx: 3.5, wy: 17.4, variant: 0 },
-      { kind: 'tree', wx: 3.6, wy: 20.6, variant: 2 },
-      { kind: 'tree', wx: 4.2, wy: 23.6, variant: 1 },
-      { kind: 'tree', wx: 32.2, wy: 4.2, variant: 3 },
-      { kind: 'tree', wx: 32.2, wy: 7.4, variant: 1 },
-      { kind: 'tree', wx: 32.2, wy: 10.6, variant: 2 },
-      { kind: 'tree', wx: 32.2, wy: 13.8, variant: 0 },
-      { kind: 'tree', wx: 32.2, wy: 17.4, variant: 3 },
-      { kind: 'tree', wx: 32.0, wy: 20.6, variant: 1 },
-      { kind: 'tree', wx: 31.4, wy: 23.6, variant: 2 },
-      { kind: 'tree', wx: 13.0, wy: 4.2, variant: 1 },
-      { kind: 'tree', wx: 22.8, wy: 4.2, variant: 0 },
-      { kind: 'tree', wx: 7.2, wy: 23.8, variant: 0 },
-      { kind: 'tree', wx: 10.6, wy: 23.8, variant: 2 },
-      { kind: 'tree', wx: 25.4, wy: 23.8, variant: 1 },
-      { kind: 'tree', wx: 28.8, wy: 23.8, variant: 3 },
-      { kind: 'bush', wx: 5.6, wy: 21.5, variant: 2 },
-      { kind: 'bush', wx: 30.2, wy: 21.5, variant: 3 },
-      { kind: 'bush', wx: 5.4, wy: 10.2, variant: 0 },
-      { kind: 'bush', wx: 30.4, wy: 10.2, variant: 1 },
-      { kind: 'bush', wx: 15.2, wy: 12.6, variant: 2 },
-      { kind: 'bush', wx: 20.8, wy: 12.6, variant: 3 },
-      { kind: 'gold_stone', wx: 14.4, wy: 11.2, variant: 1 },
-      { kind: 'gold_stone', wx: 21.6, wy: 11.2, variant: 3 },
-    ];
-
-    const expoDense: PropItem[] = [
-      { kind: 'tree', wx: 5.0, wy: 6.0, variant: 1 },
-      { kind: 'tree', wx: 5.0, wy: 12.4, variant: 0 },
-      { kind: 'tree', wx: 5.0, wy: 18.6, variant: 2 },
-      { kind: 'tree', wx: 30.6, wy: 6.0, variant: 2 },
-      { kind: 'tree', wx: 30.6, wy: 12.4, variant: 3 },
-      { kind: 'tree', wx: 30.6, wy: 18.6, variant: 1 },
-      { kind: 'stump', wx: 6.0, wy: 17.4, variant: 0 },
-      { kind: 'stump', wx: 29.6, wy: 17.4, variant: 1 },
+      { kind: 'tree', wx: 3.0, wy: 4.5, variant: 0 },
+      { kind: 'tree', wx: 3.0, wy: 8.6, variant: 2 },
+      { kind: 'tree', wx: 3.0, wy: 15.8, variant: 1 },
+      { kind: 'tree', wx: 3.6, wy: 18.4, variant: 3 },
+      { kind: 'tree', wx: 24.8, wy: 4.5, variant: 3 },
+      { kind: 'tree', wx: 24.8, wy: 8.6, variant: 1 },
+      { kind: 'tree', wx: 24.8, wy: 16.0, variant: 2 },
+      { kind: 'tree', wx: 24.2, wy: 18.4, variant: 0 },
+      { kind: 'tree', wx: 9.8, wy: 3.4, variant: 1 },
+      { kind: 'tree', wx: 18.2, wy: 3.4, variant: 0 },
+      { kind: 'tree', wx: 8.8, wy: 18.5, variant: 0 },
+      { kind: 'tree', wx: 19.2, wy: 18.5, variant: 2 },
+      { kind: 'bush', wx: 5.4, wy: 17.6, variant: 0 },
+      { kind: 'bush', wx: 22.6, wy: 17.6, variant: 2 },
+      { kind: 'bush', wx: 10.6, wy: 6.2, variant: 1 },
+      { kind: 'bush', wx: 17.4, wy: 6.2, variant: 3 },
+      { kind: 'gold_stone', wx: 10.6, wy: 16.6, variant: 1 },
+      { kind: 'gold_stone', wx: 17.4, wy: 16.6, variant: 3 },
     ];
 
     this.intelProps = [
-      { id: 'ex_hub', hardwareKey: 'core_ultra_hub', kind: 'chip', wx: 18.0, wy: 14.0, label: 'CORE ULTRA HUB [E]', accent: '#00C7FD' },
-      { id: 'ex_st_a', hardwareKey: 'expo_station_a', kind: 'booth', wx: 12.2, wy: 7.6, label: 'STATION A · ULTRA 5 [E]', accent: '#00C7FD' },
-      { id: 'ex_st_c', hardwareKey: 'expo_station_c', kind: 'booth', wx: 21.6, wy: 7.2, label: 'STATION C · ULTRA 7 [E]', accent: '#F59E0B' },
-      { id: 'ex_st_b', hardwareKey: 'expo_station_b', kind: 'booth', wx: 27.0, wy: 13.0, label: 'STATION B · ULTRA 9 [E]', accent: '#EF4444' },
-      { id: 'ex_ai_apps', hardwareKey: 'ai_pc_apps', kind: 'aiPc', wx: 10.2, wy: 17.6, label: 'FEATHERAIR · 300+ APPS [E]', accent: '#A855F7' },
-      { id: 'ex_ai_xess', hardwareKey: 'ai_pc_xess', kind: 'aiPc', wx: 25.8, wy: 17.6, label: 'CANVAS STUDIO · ARC [E]', accent: '#94A3B8' },
+      { id: 'ex_hub', hardwareKey: 'core_ultra_hub', kind: 'chip', wx: 14.0, wy: 9.3, label: 'CORE ULTRA WAFER STAGE [E]', accent: '#00C7FD' },
+      { id: 'ex_st_a', hardwareKey: 'expo_station_a', kind: 'stallStudent', wx: 9.4, wy: 8.3, label: 'STATION A · STUDENT ULTRA 5 [E]', accent: '#00C7FD' },
+      { id: 'ex_st_c', hardwareKey: 'expo_station_c', kind: 'stallCreator', wx: 18.6, wy: 8.3, label: 'STATION C · CREATOR ULTRA 7 [E]', accent: '#F59E0B' },
+      { id: 'ex_st_b', hardwareKey: 'expo_station_b', kind: 'stallGaming', wx: 22.0, wy: 10.7, label: 'STATION B · GAMING ULTRA 9 [E]', accent: '#EF4444' },
+      { id: 'ex_ai_apps', hardwareKey: 'ai_pc_apps', kind: 'aiPc', wx: 6.0, wy: 10.7, label: 'FEATHERAIR · 300+ APPS [E]', accent: '#A855F7' },
+      { id: 'ex_ai_xess', hardwareKey: 'ai_pc_xess', kind: 'aiPc', wx: 14.0, wy: 15.2, label: 'CANVAS STUDIO · ARC [E]', accent: '#94A3B8' },
     ];
 
     this.waterDecos = [
-      { kind: 'duck', wx: 18, wy: 1.0, variant: 0, phase: 0.3 },
-      { kind: 'duck', wx: 1, wy: 14, variant: 0, phase: 1.4 },
-      { kind: 'duck', wx: 34.5, wy: 15, variant: 0, phase: 2.6 },
-      { kind: 'duck', wx: 10, wy: 26.5, variant: 0, phase: 0.9 },
-      { kind: 'water_rock', wx: 8, wy: 26.6, variant: 0, phase: 0 },
-      { kind: 'water_rock', wx: 27, wy: 26.6, variant: 2, phase: 1.1 },
+      { kind: 'duck', wx: 14.0, wy: 0.9, variant: 0, phase: 0.3 },
+      { kind: 'duck', wx: 0.9, wy: 11.0, variant: 0, phase: 1.4 },
+      { kind: 'duck', wx: 26.8, wy: 11.4, variant: 0, phase: 2.6 },
+      { kind: 'duck', wx: 8.5, wy: 20.6, variant: 0, phase: 0.9 },
+      { kind: 'water_rock', wx: 6.2, wy: 20.6, variant: 0, phase: 0 },
+      { kind: 'water_rock', wx: 21.8, wy: 20.6, variant: 2, phase: 1.1 },
     ];
 
     const mkSheep = (wx: number, wy: number, wps: { wx: number; wy: number }[], state: 'IDLE' | 'GRASS' | 'MOVE' = 'GRASS'): SheepEntity => ({
@@ -1209,22 +1199,20 @@ export class SiliconWorldEngine {
     });
 
     this.sheep = [
-      mkSheep(6.0, 14.6, [{ wx: 6.0, wy: 14.6 }, { wx: 6.2, wy: 16.0 }], 'GRASS'),
-      mkSheep(29.8, 14.6, [{ wx: 29.8, wy: 14.6 }, { wx: 29.6, wy: 16.0 }], 'IDLE'),
-      mkSheep(8.6, 20.8, [{ wx: 8.6, wy: 20.8 }, { wx: 10.0, wy: 20.8 }], 'MOVE'),
-      mkSheep(27.4, 20.8, [{ wx: 27.4, wy: 20.8 }, { wx: 26.0, wy: 20.8 }], 'GRASS'),
+      mkSheep(4.8, 16.4, [{ wx: 4.8, wy: 16.4 }, { wx: 5.8, wy: 16.8 }], 'GRASS'),
+      mkSheep(23.2, 16.4, [{ wx: 23.2, wy: 16.4 }, { wx: 22.2, wy: 16.8 }], 'IDLE'),
     ];
 
     this.villagers = [
-      mkVillager(21, 'Blue', 'pawn_gold', 13.6, 12.6, [{ wx: 13.6, wy: 12.6 }, { wx: 16.6, wy: 12.6 }], 'MOVE'),
-      mkVillager(22, 'Yellow', 'monk', 22.4, 12.6, [{ wx: 22.4, wy: 12.6 }, { wx: 19.4, wy: 12.6 }], 'ACTION'),
-      mkVillager(23, 'Purple', 'pawn', 14.6, 19.8, [{ wx: 14.6, wy: 19.8 }, { wx: 16.8, wy: 17.8 }], 'MOVE'),
-      mkVillager(24, 'Red', 'archer', 21.4, 19.8, [{ wx: 21.4, wy: 19.8 }, { wx: 19.2, wy: 17.8 }], 'IDLE'),
-      mkVillager(25, 'Blue', 'monk', 18.0, 16.4, [{ wx: 18.0, wy: 16.4 }, { wx: 16.2, wy: 16.4 }, { wx: 19.8, wy: 16.4 }], 'MOVE'),
+      mkVillager(21, 'Blue', 'pawn_gold', 10.6, 11.4, [{ wx: 10.6, wy: 11.4 }, { wx: 11.8, wy: 13.4 }], 'MOVE'),
+      mkVillager(22, 'Yellow', 'monk', 17.4, 11.4, [{ wx: 17.4, wy: 11.4 }, { wx: 16.2, wy: 13.4 }], 'ACTION'),
+      mkVillager(23, 'Purple', 'pawn', 9.2, 15.6, [{ wx: 9.2, wy: 15.6 }, { wx: 11.4, wy: 15.6 }], 'MOVE'),
+      mkVillager(24, 'Red', 'archer', 18.8, 15.6, [{ wx: 18.8, wy: 15.6 }, { wx: 16.6, wy: 15.6 }], 'IDLE'),
+      mkVillager(25, 'Blue', 'monk', 14.0, 12.6, [{ wx: 14.0, wy: 12.6 }, { wx: 12.4, wy: 12.6 }, { wx: 15.6, wy: 12.6 }], 'MOVE'),
     ];
 
     this.signposts = [
-      { wx: 18, wy: 23.2, label: 'WATCH CHAMPIONS SPAR · PRESS [E] AT BOOTHS · [C] STORE GUIDE', color: '#F59E0B' },
+      { wx: 14.0, wy: 18.3, label: 'INTEL AI PC COURTYARD · [E] MEET CHAMPIONS · [C] STORE GUIDE', color: '#38BDF8' },
     ];
     this.npcs = [];
     this.tasks = [];
@@ -1236,28 +1224,30 @@ export class SiliconWorldEngine {
     this.spriteVfx = [];
 
     this.player.heroForm = 'warrior';
-    this.player.wx = 18;
-    this.player.wy = 21;
+    this.player.wx = 14.0;
+    this.player.wy = 17.2;
     this.player.hp = 100;
     this.player.battery = 100;
     this.matchedPcId = getMatchedExpoPcId(this.profile);
-    this.addSafeProps(expoDense);
     this.centerCameraInstant();
   }
 
   private addSafeProps(candidates: PropItem[]): void {
     const blockedZones: { wx: number; wy: number; r: number }[] = [
-      { wx: 9.5, wy: 42.0, r: 1.8 },
-      { wx: 23.0, wy: 39.5, r: 1.8 },
-      { wx: 18.0, wy: 21.0, r: 1.8 },
-      { wx: 32.0, wy: 26.0, r: 1.8 },
+      { wx: 6.5, wy: 30.2, r: 1.7 },
+      { wx: 18.0, wy: 28.0, r: 1.7 },
+      { wx: 14.5, wy: 16.0, r: 1.7 },
+      { wx: 23.5, wy: 17.5, r: 1.7 },
     ];
-    for (const n of this.npcs) blockedZones.push({ wx: n.wx, wy: n.wy, r: 1.7 });
-    for (const t of this.tasks) blockedZones.push({ wx: t.wx, wy: t.wy, r: 1.6 });
-    for (const e of this.enemies) blockedZones.push({ wx: e.wx, wy: e.wy, r: 1.5 });
-    for (const pk of this.pickups) blockedZones.push({ wx: pk.wx, wy: pk.wy, r: 1.2 });
-    for (const sp of this.signposts) blockedZones.push({ wx: sp.wx, wy: sp.wy, r: 1.3 });
-    for (const ip of this.intelProps) blockedZones.push({ wx: ip.wx, wy: ip.wy, r: ip.kind === 'booth' ? 1.8 : 1.3 });
+    for (const n of this.npcs) blockedZones.push({ wx: n.wx, wy: n.wy, r: 1.6 });
+    for (const t of this.tasks) blockedZones.push({ wx: t.wx, wy: t.wy, r: 1.5 });
+    for (const e of this.enemies) blockedZones.push({ wx: e.wx, wy: e.wy, r: 1.4 });
+    for (const pk of this.pickups) blockedZones.push({ wx: pk.wx, wy: pk.wy, r: 1.1 });
+    for (const sp of this.signposts) blockedZones.push({ wx: sp.wx, wy: sp.wy, r: 1.2 });
+    for (const ip of this.intelProps) {
+      const isStall = ip.kind === 'booth' || ip.kind.startsWith('stall');
+      blockedZones.push({ wx: ip.wx, wy: ip.wy, r: isStall ? 1.8 : 1.25 });
+    }
     if (this.zone === 'EXPO_PARK') {
       for (const pc of EXPO_PC_CATALOG) blockedZones.push({ wx: pc.wx, wy: pc.wy, r: 2.1 });
     }
@@ -1280,11 +1270,11 @@ export class SiliconWorldEngine {
       // Keep bridges clear
       if (
         this.zone === 'SILICON_CITY' &&
-        ((tx >= 16 && tx <= 21 && ty >= 37 && ty <= 42) ||
-          (tx >= 18 && tx <= 22 && ty >= 21 && ty <= 26) ||
-          (tx >= 42 && tx <= 46 && ty >= 21 && ty <= 26) ||
-          (tx >= 29 && tx <= 34 && ty >= 14 && ty <= 18) ||
-          (tx >= 29 && tx <= 34 && ty >= 30 && ty <= 34))
+        ((tx >= 12 && tx <= 17 && ty >= 26 && ty <= 30) ||
+          (tx >= 12 && tx <= 17 && ty >= 14 && ty <= 18) ||
+          (tx >= 30 && tx <= 35 && ty >= 14 && ty <= 18) ||
+          (tx >= 21 && tx <= 26 && ty >= 9 && ty <= 13) ||
+          (tx >= 21 && tx <= 26 && ty >= 19 && ty <= 24))
       ) {
         continue;
       }
@@ -1306,19 +1296,58 @@ export class SiliconWorldEngine {
     }
   }
 
-  private makeEnemy(unitClass: EnemyClass, wx: number, wy: number): EnemyEntity {
+  private makeEnemy(
+    unitClass: EnemyClass,
+    wx: number,
+    wy: number,
+    islandTier: 1 | 2 | 3 | 4 = 1
+  ): EnemyEntity {
     const faction: FactionColor =
-      unitClass.startsWith('red') ? 'Red' : unitClass.startsWith('purple') ? 'Purple' : 'Black';
-    const maxHp =
+      unitClass.startsWith('red')
+        ? 'Red'
+        : unitClass.startsWith('purple')
+          ? 'Purple'
+          : 'Black';
+    const baseHp =
       unitClass === 'black_warrior' || unitClass === 'purple_lancer'
-        ? 52
-        : unitClass.includes('archer')
-          ? 40
-          : 34;
+        ? 54
+        : unitClass === 'spectral_knight'
+          ? 44
+          : unitClass === 'red_warrior'
+            ? 44
+            : unitClass.includes('archer')
+              ? 40
+              : 34;
+    const hpMultByTier: Record<1 | 2 | 3 | 4, number> = {
+      1: 1.0,
+      2: 1.32,
+      3: 1.68,
+      4: unitClass === 'spectral_knight' ? 1.25 : 1.95,
+    };
+    const dmgByTier: Record<1 | 2 | 3 | 4, number> = {
+      1: 10,
+      2: 13,
+      3: 16,
+      4: 18,
+    };
+    const spdByTier: Record<1 | 2 | 3 | 4, number> = {
+      1: 1.0,
+      2: 1.08,
+      3: 1.18,
+      4: 1.24,
+    };
+    const maxHp = Math.round(baseHp * hpMultByTier[islandTier]);
+    const isSpectral = unitClass === 'spectral_knight';
     return {
       id: this.nextEntityId++,
       unitClass,
       faction,
+      islandTier,
+      damage: dmgByTier[islandTier],
+      speedMult: spdByTier[islandTier],
+      isSpectral,
+      riseElapsed: isSpectral ? 0 : undefined,
+      riseDuration: isSpectral ? 0.72 : undefined,
       wx,
       wy,
       vx: 0,
@@ -1326,7 +1355,7 @@ export class SiliconWorldEngine {
       hp: maxHp,
       maxHp,
       state: 'PATROL',
-      stateTimer: 0.7 + Math.random(),
+      stateTimer: isSpectral ? 0.85 : 0.7 + Math.random(),
       hitFlash: 0,
       shootTimer: 1.4 + Math.random(),
       flipX: false,
@@ -1354,6 +1383,15 @@ export class SiliconWorldEngine {
       if (tx < 0 || ty < 0 || tx >= this.mapW || ty >= this.mapH) return false;
       const t = this.map[ty][tx];
       if (t === 0 || t === 8 || t === 9) return false;
+      if (
+        this.zone === 'SILICON_CITY' &&
+        !this.bossGateOpen &&
+        ty <= 11 &&
+        tx >= 21 &&
+        tx <= 26
+      ) {
+        return false;
+      }
     }
 
     // Collide with tree trunks, stumps, bushes/grass patches, rocks, and gold stones
@@ -1374,10 +1412,10 @@ export class SiliconWorldEngine {
       }
     }
 
-    // Collide with Intel AI PC booths, chips, and laptops
+    // Collide with Intel AI PC booths, stalls, chips, and laptops
     for (const ip of this.intelProps) {
-      if (ip.kind === 'booth') {
-        if (Math.abs(wx - ip.wx) < 0.85 + radius && Math.abs(wy - (ip.wy - 0.15)) < 0.5 + radius) {
+      if (ip.kind === 'booth' || ip.kind.startsWith('stall')) {
+        if (Math.abs(wx - ip.wx) < 0.88 + radius && Math.abs(wy - (ip.wy - 0.15)) < 0.52 + radius) {
           return false;
         }
       } else if (Math.hypot(wx - ip.wx, wy - ip.wy) < radius + 0.38) {
@@ -1396,7 +1434,7 @@ export class SiliconWorldEngine {
         if (Math.hypot(wx - v.wx, wy - v.wy) < radius + 0.16) return false;
       }
       for (const n of this.npcs) {
-        if (n === ignore || n.kind === 'trap_gate' || n.kind === 'boss_gate') continue;
+        if (n === ignore) continue;
         if (Math.hypot(wx - n.wx, wy - n.wy) < radius + 0.28) return false;
       }
       if (ignore && ignore !== this.player) {
@@ -1440,11 +1478,11 @@ export class SiliconWorldEngine {
   private getCurrentDistrict(): DistrictId {
     if (this.zone === 'EXPO_PARK') return 'EXPO_PARK';
     const { wx, wy } = this.player;
-    if (wx < 19 && wy >= 32) return 'TRAP_ALLEY';
-    if (wy >= 32) return 'ECORE_PARK';
-    if (wx < 21) return 'NPU_LIBRARY';
-    if (wx > 43) return 'ARC_ARENA';
-    if (wy < 16) return 'BOSS_COLOSSEUM';
+    if (wx < 15 && wy >= 22) return 'TRAP_ALLEY';
+    if (wy >= 22) return 'ECORE_PARK';
+    if (wx < 15.5) return 'NPU_LIBRARY';
+    if (wx > 31.5) return 'ARC_ARENA';
+    if (wy < 11) return 'BOSS_COLOSSEUM';
     return 'COPPER_PLAZA';
   }
 
@@ -1484,6 +1522,72 @@ export class SiliconWorldEngine {
       if (this.bannerTimer <= 0) this.bannerText = null;
     }
     if (this.shakeTimer > 0) this.shakeTimer -= dt;
+
+    // Smooth Island-to-Island Weather Transitions (noticeable lighting + ambient particles per district)
+    const curDist = this.getCurrentDistrict();
+    const keys: DistrictId[] = [
+      'TRAP_ALLEY',
+      'ECORE_PARK',
+      'COPPER_PLAZA',
+      'NPU_LIBRARY',
+      'ARC_ARENA',
+      'BOSS_COLOSSEUM',
+      'EXPO_PARK',
+    ];
+    for (const k of keys) {
+      const target = k === curDist ? 1 : 0;
+      this.weatherMix[k] += (target - this.weatherMix[k]) * Math.min(1, dt * 2.4);
+    }
+
+    const stormTarget =
+      this.zone === 'SILICON_CITY' && (curDist === 'BOSS_COLOSSEUM' || this.player.wy < 11.5)
+        ? 1
+        : 0;
+    this.stormIntensity += (stormTarget - this.stormIntensity) * Math.min(1, dt * 2.2);
+
+    if (this.lightningFlash > 0) {
+      this.lightningFlash = Math.max(0, this.lightningFlash - dt * 3.1);
+    }
+    if (this.stormIntensity > 0.35 && this.phase === 'PLAYING') {
+      this.lightningTimer -= dt;
+      if (this.lightningTimer <= 0) {
+        this.lightningTimer = this.boss.splitActive ? 2.2 + Math.random() * 2.2 : 3.2 + Math.random() * 3.4;
+        this.lightningFlash = 0.9;
+        this.lightningSeed = Math.random() * 100;
+      }
+    }
+
+    // Animate rain drops for Boss Storm & NPU Twilight Drizzle
+    if (this.stormIntensity > 0.08 || this.weatherMix.NPU_LIBRARY > 0.08) {
+      const spdScale = this.stormIntensity > 0.2 ? 1.0 : 0.42;
+      for (const rd of this.rainDrops) {
+        rd.x -= rd.speed * 0.24 * spdScale * dt;
+        rd.y += rd.speed * spdScale * dt;
+        if (rd.y > 1.05) {
+          rd.y = -0.06;
+          rd.x = Math.random() * 1.15;
+        }
+        if (rd.x < -0.08) rd.x += 1.15;
+      }
+    }
+
+    // Animate district-specific motes (embers, morning pollen, fireflies, sunset wind streaks)
+    for (const m of this.weatherMotes) {
+      if (this.weatherMix.ARC_ARENA > 0.3) {
+        m.x -= m.speed * 1.9 * dt;
+        m.y += Math.sin(this.elapsed * 2.4 + m.phase) * 0.05 * dt;
+      } else if (this.weatherMix.TRAP_ALLEY > 0.3) {
+        m.y -= m.speed * 0.48 * dt;
+        m.x += Math.sin(this.elapsed * 1.8 + m.phase) * 0.04 * dt;
+      } else {
+        m.x += m.speed * 0.45 * dt;
+        m.y += Math.sin(this.elapsed * 1.5 + m.phase) * 0.05 * dt;
+      }
+      if (m.x < -0.05) m.x = 1.05;
+      if (m.x > 1.05) m.x = -0.05;
+      if (m.y < -0.05) m.y = 1.05;
+      if (m.y > 1.05) m.y = -0.05;
+    }
 
     if (this.phase === 'TITLE') {
       this.updateAttractMode(dt);
@@ -1565,21 +1669,47 @@ export class SiliconWorldEngine {
 
     const dist = this.getCurrentDistrict();
     const fitScale = Math.min(1, Math.max(0.68, Math.min(this.viewW / 1040, this.viewH / 580)));
-    const baseZoom = dist === 'BOSS_COLOSSEUM' ? 0.85 : this.zone === 'EXPO_PARK' ? 1.0 : 0.96;
+    const baseZoom = dist === 'BOSS_COLOSSEUM' ? 0.85 : this.zone === 'EXPO_PARK' ? 1.06 : 0.96;
     this.targetZoom = baseZoom * fitScale;
 
     if (dist !== this.prevDistrict) {
       this.prevDistrict = dist;
       const titles: Record<DistrictId, string> = {
-        TRAP_ALLEY: 'ISLAND 1 · BARGAIN TRAP ALLEY',
-        ECORE_PARK: 'ISLAND 2 · E-CORE EFFICIENCY PARK',
-        COPPER_PLAZA: 'ISLAND 3 · COPPER BUS PLAZA',
-        NPU_LIBRARY: 'ISLAND 4 · NPU OFFLINE MONASTERY',
-        ARC_ARENA: 'ISLAND 5 · ARC XeSS ARCHERY ARENA',
-        BOSS_COLOSSEUM: 'OVERCLOCKED COLOSSEUM · BLACK CITADEL',
-        EXPO_PARK: 'INTEL AI PC EXPO PARK',
+        TRAP_ALLEY: 'ACT I · 1:47 AM STUDY COVE',
+        ECORE_PARK: 'ACT II · HARBOR OF QUIET HOURS',
+        COPPER_PLAZA: 'COPPER BUS CROSSROADS',
+        NPU_LIBRARY: 'ACT III · LIBRARY OF UNSPOKEN NOTES',
+        ARC_ARENA: 'ACT III · DAWN HORIZON ARENA',
+        BOSS_COLOSSEUM: 'ACT IV · THE BURNOUT CITADEL',
+        EXPO_PARK: 'ACT V · INTEL AI PC FESTIVAL COURTYARD',
       };
       this.showBanner(titles[dist], 2.4);
+    }
+
+    // Dynamic Story Soundtrack Routing (all 8 repository tracks)
+    if (this.phase === 'EXPO_PARK') {
+      gameAudio.setMusicMode('expo');
+    } else if (this.phase === 'PLAYING') {
+      if (this.boss.active) {
+        gameAudio.setMusicMode(this.boss.phase === 3 ? 'boss_climax' : 'boss');
+      } else if (!this.trapCompleted && dist === 'TRAP_ALLEY') {
+        gameAudio.setMusicMode('trap');
+      } else if (
+        dist === 'BOSS_COLOSSEUM' ||
+        (this.bossGateOpen && this.player.wy < 13.5 && Math.abs(this.player.wx - 23.5) < 4.5)
+      ) {
+        gameAudio.setMusicMode('dungeon');
+      } else if (
+        this.enemies.some(
+          (e) =>
+            e.state !== 'PATROL' ||
+            Math.hypot(e.wx - this.player.wx, e.wy - this.player.wy) < 4.8
+        )
+      ) {
+        gameAudio.setMusicMode('battle');
+      } else {
+        gameAudio.setMusicMode('city');
+      }
     }
 
     this.profile.batteryRemaining = this.player.battery;
@@ -1712,8 +1842,8 @@ export class SiliconWorldEngine {
 
   private updateAttractMode(dt: number): void {
     this.attractTimer += dt;
-    const tx = 32 + Math.cos(this.attractTimer * 0.55) * 7.5;
-    const ty = 24.5 + Math.sin(this.attractTimer * 0.75) * 4.5;
+    const tx = 23.5 + Math.cos(this.attractTimer * 0.55) * 4.8;
+    const ty = 16.0 + Math.sin(this.attractTimer * 0.75) * 2.8;
     const dx = tx - this.player.wx;
     const dy = ty - this.player.wy;
     const len = Math.hypot(dx, dy);
@@ -1819,11 +1949,6 @@ export class SiliconWorldEngine {
       const nearTask = this.findNearestTask(1.9);
       if (nearNpc) {
         this.interactBuffer = 0;
-        if (nearNpc.kind === 'boss_gate') {
-          this.showBanner('Unlock NPU Monastery (West) & Arc Archery (East) first!', 2.6);
-          gameAudio.playBossTelegraph();
-          return;
-        }
         nearNpc.interacted = true;
         this.targetZoom = 1.15;
         this.phase = 'DIALOGUE';
@@ -1864,22 +1989,31 @@ export class SiliconWorldEngine {
     if (this.attackBuffer > 0 && this.player.attackCooldown <= 0 && this.trapCompleted) {
       this.attackBuffer = 0;
       const buff = this.player.xessBuffTimer > 0;
-      this.player.attackTimer = 0.2;
+      this.player.attackTimer = 0.22;
       this.player.attackCooldown = buff ? 0.2 : 0.28;
       this.player.attackAlt = !this.player.attackAlt;
       gameAudio.playSlash();
 
       const radius = buff ? 2.4 : 1.95;
       const dmg = buff ? 32 : 24;
-      this.slashes.push({
-        wx: this.player.wx,
-        wy: this.player.wy,
-        angle: this.player.facingAngle,
-        timer: 0.16,
-        maxTimer: 0.16,
-        color: buff ? '#22D3EE' : '#00C7FD',
-        radius,
-      });
+      const fxX = this.player.wx + Math.cos(this.player.facingAngle) * 0.85;
+      const fxY = this.player.wy + Math.sin(this.player.facingAngle) * 0.85;
+      // Pure sprite slash dust + spark particles (no blocky geometric stroke arc)
+      this.spawnSpriteFx(buff ? 'fire3' : 'dust2', fxX, fxY, buff ? 82 : 66, 0.28, this.player.flipX);
+      for (let k = -2; k <= 2; k++) {
+        const a = this.player.facingAngle + k * 0.28;
+        const r = (radius * 0.55) * TILE_SIZE;
+        this.particles.push({
+          x: this.player.wx * TILE_SIZE + Math.cos(a) * r,
+          y: this.player.wy * TILE_SIZE - 18 + Math.sin(a) * r,
+          vx: Math.cos(a) * 95,
+          vy: Math.sin(a) * 95,
+          life: 0.22,
+          maxLife: 0.22,
+          color: buff ? '#38BDF8' : '#7DD3FC',
+          size: 2.8,
+        });
+      }
       this.performMeleeHit(radius, dmg);
     }
 
@@ -1921,8 +2055,16 @@ export class SiliconWorldEngine {
           this.damageEnemy(enemy, 42, true);
         }
       }
-      if (this.boss.active && Math.hypot(this.boss.wx - this.player.wx, this.boss.wy - this.player.wy) <= 5.0) {
-        this.damageBoss(40, true);
+      if (this.boss.active) {
+        if (this.boss.splitActive) {
+          for (const twin of this.boss.twins) {
+            if (twin.hp > 0 && Math.hypot(twin.wx - this.player.wx, twin.wy - this.player.wy) <= 5.0) {
+              this.damageTwinBoss(twin, 38, true);
+            }
+          }
+        } else if (Math.hypot(this.boss.wx - this.player.wx, this.boss.wy - this.player.wy) <= 5.0) {
+          this.damageBoss(40, true);
+        }
       }
     }
   }
@@ -1941,11 +2083,16 @@ export class SiliconWorldEngine {
         this.rescueTask(task);
       }
     }
-    if (this.boss.active && Math.hypot(this.boss.wx - cx, this.boss.wy - cy) <= radius * 1.15) {
-      this.damageBoss(damage, false);
-    }
     if (this.boss.active) {
-      this.boss.decoys = this.boss.decoys.filter((d) => Math.hypot(d.wx - cx, d.wy - cy) > radius * 0.95);
+      if (this.boss.splitActive) {
+        for (const twin of this.boss.twins) {
+          if (twin.hp > 0 && Math.hypot(twin.wx - cx, twin.wy - cy) <= radius * 1.05) {
+            this.damageTwinBoss(twin, damage, false);
+          }
+        }
+      } else if (Math.hypot(this.boss.wx - cx, this.boss.wy - cy) <= radius * 1.15) {
+        this.damageBoss(damage, false);
+      }
     }
   }
 
@@ -1995,8 +2142,111 @@ export class SiliconWorldEngine {
     }
   }
 
+  private summonSpectralPortal(wx: number, wy: number): void {
+    this.boss.portals.push({
+      wx,
+      wy,
+      elapsed: 0,
+      duration: 0.85,
+      spawned: false,
+    });
+    this.spawnSpriteFx('dust2', wx, wy, 90, 0.55);
+  }
+
+  private triggerBossSplit(): void {
+    const b = this.boss;
+    b.splitActive = true;
+    b.phase = 3;
+    const twinMaxHp = Math.max(95, Math.round(b.maxHp * 0.25));
+    const twinEachHp = Math.max(70, Math.round(b.hp / 2));
+    b.twins = [
+      {
+        id: 1,
+        name: 'Thermal Titan',
+        wx: Math.max(18.5, b.wx - 2.2),
+        wy: b.wy,
+        hp: twinEachHp,
+        maxHp: Math.max(twinMaxHp, twinEachHp),
+        state: 'IDLE',
+        stateTimer: 0.9,
+        hitFlash: 0.2,
+        attackAlt: false,
+        flipX: false,
+      },
+      {
+        id: 2,
+        name: 'Throttle Titan',
+        wx: Math.min(28.5, b.wx + 2.2),
+        wy: b.wy,
+        hp: twinEachHp,
+        maxHp: Math.max(twinMaxHp, twinEachHp),
+        state: 'IDLE',
+        stateTimer: 1.25,
+        hitFlash: 0.2,
+        attackAlt: true,
+        flipX: true,
+      },
+    ];
+    b.hp = b.twins.reduce((sum, t) => sum + t.hp, 0);
+    gameAudio.playBossPhase();
+    gameAudio.setMusicMode('boss_climax');
+    this.lightningFlash = 1.0;
+    this.hitstopTimer = 0.065;
+    this.triggerShake(0.45, 10);
+    this.spawnSpriteFx('explosion2', b.wx, b.wy, 210, 0.72);
+    this.spawnSpriteFx('fire3', b.twins[0].wx, b.twins[0].wy, 125, 0.65);
+    this.spawnSpriteFx('fire3', b.twins[1].wx, b.twins[1].wy, 125, 0.65);
+    this.showBanner('50% SPLIT · THERMAL TITAN & THROTTLE TITAN!', 3.2);
+    this.summonSpectralPortal(19.2, 7.6);
+    this.summonSpectralPortal(27.8, 7.6);
+  }
+
+  private completeBossVictory(vx: number, vy: number): void {
+    this.boss.active = false;
+    this.boss.portals = [];
+    this.boss.twins = [];
+    this.telegraphs = [];
+    this.projectiles = [];
+    this.enemies = [];
+    this.hitstopTimer = 0.085;
+    this.triggerShake(0.6, 12);
+    this.spawnSpriteFx('explosion2', vx, vy, 240, 0.8);
+    this.spawnSpriteFx('healEffect', this.player.wx, this.player.wy, 180, 0.85);
+    this.spawnBurstWorld(vx, vy, '#00C7FD', 40);
+    gameAudio.playVictory();
+    gameAudio.playTransform();
+    this.phase = 'EXPO_TRANSFORM';
+    this.transformTimer = 2.4;
+    this.matchedPcId = getMatchedExpoPcId(this.profile);
+    this.showBanner('LAG TITAN DEFEATED · TRANSFORMING INTO EXPO PARK!', 3.2);
+    this.emitHud();
+  }
+
+  private damageTwinBoss(twin: TwinBossEntity, dmg: number, fromNpu: boolean): void {
+    if (!this.boss.active || !this.boss.splitActive || twin.hp <= 0) return;
+    twin.hp = Math.max(0, twin.hp - dmg);
+    twin.hitFlash = 0.14;
+    this.player.npuCharge = Math.min(100, this.player.npuCharge + 11);
+    gameAudio.playHit(fromNpu);
+    this.hitstopTimer = 0.036;
+    this.triggerShake(0.13, 4.2);
+    this.spawnSpriteFx(fromNpu ? 'explosion2' : 'explosion1', twin.wx, twin.wy, 105, 0.42);
+    this.spawnFloatingText(twin.wx, twin.wy - 0.9, `-${dmg}`, fromNpu ? '#38BDF8' : '#FBBF24');
+
+    this.boss.hp = this.boss.twins.reduce((sum, t) => sum + Math.max(0, t.hp), 0);
+    if (twin.hp <= 0) {
+      this.spawnSpriteFx('explosion2', twin.wx, twin.wy, 190, 0.68);
+      this.spawnBurstWorld(twin.wx, twin.wy, '#F59E0B', 24);
+      if (this.boss.hp > 0) {
+        this.showBanner(`${twin.name.toUpperCase()} FALLEN — DEFEAT THE REMAINING TWIN!`, 2.4);
+      } else {
+        this.completeBossVictory(twin.wx, twin.wy);
+      }
+    }
+  }
+
   private damageBoss(dmg: number, fromNpu: boolean): void {
-    if (!this.boss.active) return;
+    if (!this.boss.active || this.boss.splitActive) return;
 
     if (this.boss.shield > 0) {
       const sDmg = fromNpu ? dmg * 1.65 : Math.max(9, Math.round(dmg * 0.65));
@@ -2034,48 +2284,27 @@ export class SiliconWorldEngine {
     this.spawnFloatingText(this.boss.wx, this.boss.wy - 1.0, `-${finalDmg}`, '#FBBF24');
 
     const ratio = this.boss.hp / this.boss.maxHp;
-    if (this.boss.phase === 1 && ratio <= 0.66 && this.boss.hp > 0) {
+    if (this.boss.phase === 1 && ratio <= 0.74 && this.boss.hp > 0) {
       this.boss.phase = 2;
-      this.boss.state = 'STUNNED';
-      this.boss.stateTimer = 1.05;
-      gameAudio.playBossPhase();
-      this.triggerShake(0.36, 8);
-      this.spawnSpriteFx('fire2', 26, 9, 90, 0.9);
-      this.spawnSpriteFx('fire2', 38, 9, 90, 0.9);
-      this.showBanner('PHASE 2 · BLACK TOWER VOLLEY & ARCHERS!', 2.6);
-      this.enemies.push(this.makeEnemy('black_archer', 26, 9.5));
-      this.enemies.push(this.makeEnemy('black_archer', 38, 9.5));
-    } else if (this.boss.phase === 2 && ratio <= 0.33 && this.boss.hp > 0) {
-      this.boss.phase = 3;
       this.boss.state = 'STUNNED';
       this.boss.stateTimer = 1.0;
       gameAudio.playBossPhase();
-      this.triggerShake(0.4, 9);
-      this.spawnSpriteFx('explosion2', this.boss.wx, this.boss.wy, 180, 0.6);
-      this.showBanner('PHASE 3 · SINGLE-LANE PANIC OVERLOAD!', 2.6);
-      this.boss.decoys = [
-        { wx: 26, wy: 8.5, life: 12 },
-        { wx: 38, wy: 8.5, life: 12 },
-      ];
+      this.triggerShake(0.36, 8);
+      this.spawnSpriteFx('fire2', 19.2, 6.4, 90, 0.9);
+      this.spawnSpriteFx('fire2', 27.8, 6.4, 90, 0.9);
+      this.showBanner('PHASE 2 · FALLEN KNIGHTS RISE FROM DARK PORTALS!', 2.6);
+      this.summonSpectralPortal(19.4, 7.6);
+      this.summonSpectralPortal(27.6, 7.6);
+    }
+
+    // At 50% HP, Black Warlord splits into two half-strength Twin Mini-Bosses!
+    if (!this.boss.splitActive && ratio <= 0.5 && this.boss.hp > 0) {
+      this.triggerBossSplit();
+      return;
     }
 
     if (this.boss.hp <= 0) {
-      this.boss.active = false;
-      this.telegraphs = [];
-      this.projectiles = [];
-      this.enemies = [];
-      this.hitstopTimer = 0.085;
-      this.triggerShake(0.6, 12);
-      this.spawnSpriteFx('explosion2', this.boss.wx, this.boss.wy, 240, 0.8);
-      this.spawnSpriteFx('healEffect', this.player.wx, this.player.wy, 180, 0.85);
-      this.spawnBurstWorld(this.boss.wx, this.boss.wy, '#00C7FD', 40);
-      gameAudio.playVictory();
-      gameAudio.playTransform();
-      this.phase = 'EXPO_TRANSFORM';
-      this.transformTimer = 2.4;
-      this.matchedPcId = getMatchedExpoPcId(this.profile);
-      this.showBanner('LAG TITAN DEFEATED · TRANSFORMING INTO EXPO PARK!', 3.2);
-      this.emitHud();
+      this.completeBossVictory(this.boss.wx, this.boss.wy);
     }
   }
 
@@ -2110,11 +2339,10 @@ export class SiliconWorldEngine {
           this.spawnFloatingText(this.player.wx, this.player.wy - 0.6, '11 FPS LAG!', '#EF4444');
         }
       }
-      const gate = this.npcs.find((n) => n.kind === 'trap_gate');
-      if (gate && Math.hypot(gate.wx - this.player.wx, gate.wy - this.player.wy) < 1.8) {
+      if (this.player.wx >= 11.6 && this.player.wy >= 26.5 && this.player.wy <= 30.5) {
         gameAudio.playCrash();
         this.triggerShake(0.42, 8);
-        this.spawnSpriteFx('explosion1', gate.wx, gate.wy, 120, 0.5);
+        this.spawnSpriteFx('explosion1', this.player.wx, this.player.wy, 120, 0.5);
         this.phase = 'DIALOGUE';
         this.heldKeys.clear();
         this.callbacks.onStartDialogue('trap_meltdown');
@@ -2127,7 +2355,13 @@ export class SiliconWorldEngine {
     }
     this.player.battery = Math.max(40, this.player.battery - dt * 0.12);
 
-    if (this.bossGateOpen && !this.bossTriggered && this.player.wy < 13.8) {
+    if (!this.bossGateOpen && this.player.wy < 12.6 && Math.abs(this.player.wx - 23.5) < 2.6) {
+      if (this.bannerTimer <= 0) {
+        this.showBanner('Unlock NPU Monastery (West) & Arc Archery (East) first!', 2.2);
+      }
+    }
+
+    if (this.bossGateOpen && !this.bossTriggered && this.player.wy < 9.5) {
       this.bossTriggered = true;
       this.phase = 'DIALOGUE';
       this.heldKeys.clear();
@@ -2143,6 +2377,14 @@ export class SiliconWorldEngine {
         continue;
       }
       if (e.hitFlash > 0) e.hitFlash -= dt;
+
+      // Spectral Fallen Knights smoothly rise from dark portals before engaging
+      if (e.isSpectral && e.riseElapsed !== undefined && e.riseDuration !== undefined && e.riseElapsed < e.riseDuration) {
+        e.riseElapsed += dt;
+        e.flipX = this.player.wx < e.wx;
+        continue;
+      }
+
       const dx = this.player.wx - e.wx;
       const dy = this.player.wy - e.wy;
       const dist = Math.hypot(dx, dy);
@@ -2150,17 +2392,19 @@ export class SiliconWorldEngine {
       e.stateTimer -= dt;
 
       if (e.unitClass.includes('archer')) {
-        if (dist < 8.2 && e.shootTimer <= 0) {
-          e.shootTimer = 2.2;
+        if (dist < 8.4 && e.shootTimer <= 0) {
+          e.shootTimer = Math.max(1.5, 2.3 - (e.islandTier - 1) * 0.22);
           const len = Math.max(0.1, dist);
+          const pSpeed = 5.0 + (e.islandTier - 1) * 0.55;
           this.projectiles.push({
             wx: e.wx,
             wy: e.wy,
-            vx: (dx / len) * 5.2,
-            vy: (dy / len) * 5.2,
+            vx: (dx / len) * pSpeed,
+            vy: (dy / len) * pSpeed,
             life: 2.2,
             color: e.faction === 'Red' ? '#EF4444' : '#94A3B8',
             radius: 0.25,
+            damage: Math.max(9, e.damage - 2),
             arrowFaction: e.faction,
           });
         } else {
@@ -2169,25 +2413,27 @@ export class SiliconWorldEngine {
       }
 
       if (e.state === 'PATROL') {
-        if (dist < 5.6) {
+        const aggroRange = e.isSpectral ? 11.0 : 5.6 + (e.islandTier - 1) * 0.45;
+        if (dist < aggroRange) {
           e.state = 'WINDUP';
-          e.stateTimer = 0.5;
+          e.stateTimer = Math.max(0.36, 0.52 - (e.islandTier - 1) * 0.04);
         }
       } else if (e.state === 'WINDUP') {
         if (e.stateTimer <= 0) {
           e.state = 'LUNGE';
           e.stateTimer = 0.36;
           const len = Math.max(0.1, dist);
-          const spd = e.unitClass.includes('archer') ? 3.5 : 6.0;
+          const baseSpd = e.unitClass.includes('archer') ? 3.5 : e.isSpectral ? 6.5 : 6.0;
+          const spd = baseSpd * e.speedMult;
           e.vx = (dx / len) * spd;
           e.vy = (dy / len) * spd;
         }
       } else if (e.state === 'LUNGE') {
         this.moveWithCollision(e, e.vx * dt, e.vy * dt, 0.25);
-        if (dist < 0.85) this.damagePlayer(12);
+        if (dist < 0.85) this.damagePlayer(e.damage);
         if (e.stateTimer <= 0) {
           e.state = 'COOLDOWN';
-          e.stateTimer = 0.65;
+          e.stateTimer = Math.max(0.48, 0.68 - (e.islandTier - 1) * 0.05);
         }
       } else if (e.state === 'COOLDOWN') {
         if (e.stateTimer <= 0) e.state = 'PATROL';
@@ -2199,18 +2445,42 @@ export class SiliconWorldEngine {
     const b = this.boss;
     if (b.hitFlash > 0) b.hitFlash -= dt;
 
-    for (let i = b.decoys.length - 1; i >= 0; i--) {
-      b.decoys[i].life -= dt;
-      if (b.decoys[i].life <= 0) b.decoys.splice(i, 1);
+    // Update active Dark Ground Portals & spawn animated Spectral Fallen Knights when ready
+    for (let i = b.portals.length - 1; i >= 0; i--) {
+      const pt = b.portals[i];
+      pt.elapsed += dt;
+      if (!pt.spawned && pt.elapsed >= pt.duration * 0.65) {
+        pt.spawned = true;
+        if (this.enemies.length < 5) {
+          this.enemies.push(this.makeEnemy('spectral_knight', pt.wx, pt.wy, 4));
+          this.spawnBurstWorld(pt.wx, pt.wy, '#67E8F9', 14);
+        }
+      }
+      if (pt.elapsed >= pt.duration) {
+        b.portals.splice(i, 1);
+      }
+    }
+
+    // Periodically summon Spectral Fallen Knights during Phase 2+
+    if (b.phase >= 2) {
+      b.portalCooldown -= dt;
+      if (b.portalCooldown <= 0) {
+        b.portalCooldown = b.splitActive ? 7.5 : 8.5;
+        if (this.enemies.filter((e) => e.isSpectral).length < 2) {
+          const sx = this.player.wx < 23.5 ? 27.6 : 19.4;
+          const sy = 7.2 + (Math.random() - 0.5) * 1.8;
+          this.summonSpectralPortal(sx, sy);
+        }
+      }
     }
 
     // Flanking Black Towers fire arrows periodically!
     b.towerTimer -= dt;
     if (b.towerTimer <= 0) {
-      b.towerTimer = b.phase === 3 ? 2.2 : 3.2;
+      b.towerTimer = b.splitActive ? 2.5 : 3.2;
       const towers = [
-        { wx: 24.0, wy: 6.8 },
-        { wx: 40.0, wy: 6.8 },
+        { wx: 18.0, wy: 5.5 },
+        { wx: 30.0, wy: 5.5 },
       ];
       for (const tw of towers) {
         const dx = this.player.wx - tw.wx;
@@ -2224,9 +2494,81 @@ export class SiliconWorldEngine {
           life: 2.6,
           color: '#F97316',
           radius: 0.28,
+          damage: 12,
           arrowFaction: 'Black',
         });
       }
+    }
+
+    // Post-50% Split: two half-strength Twin Mini-Bosses attack simultaneously
+    if (b.splitActive) {
+      for (const twin of b.twins) {
+        if (twin.hp <= 0) continue;
+        if (twin.hitFlash > 0) twin.hitFlash -= dt;
+        const dx = this.player.wx - twin.wx;
+        const dy = this.player.wy - twin.wy;
+        const dist = Math.hypot(dx, dy);
+        twin.flipX = dx < 0;
+        twin.stateTimer -= dt;
+
+        if (twin.state === 'IDLE') {
+          if (dist > 2.0) {
+            const spd = 2.65;
+            this.moveWithCollision(twin, (dx / dist) * spd * dt, (dy / dist) * spd * dt, 0.44);
+          }
+          if (twin.stateTimer <= 0) {
+            twin.attackAlt = !twin.attackAlt;
+            if (twin.attackAlt) {
+              twin.state = 'WINDUP_SLAM';
+              twin.stateTimer = 0.72;
+              gameAudio.playBossTelegraph();
+              this.telegraphs.push({
+                wx: this.player.wx + (twin.id === 1 ? -0.45 : 0.45),
+                wy: this.player.wy,
+                radius: 1.75,
+                timer: twin.stateTimer,
+                maxTimer: twin.stateTimer,
+                damage: 10, // Half-strength compared to Lag Titan
+              });
+            } else {
+              twin.state = 'WINDUP_FAN';
+              twin.stateTimer = 0.56;
+              gameAudio.playBossTelegraph();
+            }
+          }
+        } else if (twin.state === 'WINDUP_SLAM') {
+          if (twin.stateTimer <= 0) {
+            twin.state = 'COOLDOWN';
+            twin.stateTimer = 0.72;
+          }
+        } else if (twin.state === 'WINDUP_FAN') {
+          if (twin.stateTimer <= 0) {
+            const base = Math.atan2(dy, dx);
+            for (let k = -1; k <= 1; k++) {
+              const ang = base + k * 0.24;
+              this.projectiles.push({
+                wx: twin.wx,
+                wy: twin.wy,
+                vx: Math.cos(ang) * 5.6,
+                vy: Math.sin(ang) * 5.6,
+                life: 2.5,
+                color: twin.id === 1 ? '#EF4444' : '#A855F7',
+                radius: 0.26,
+                damage: 9,
+              });
+            }
+            gameAudio.playHit(false);
+            twin.state = 'COOLDOWN';
+            twin.stateTimer = 0.78;
+          }
+        } else if (twin.state === 'COOLDOWN') {
+          if (twin.stateTimer <= 0) {
+            twin.state = 'IDLE';
+            twin.stateTimer = 0.6;
+          }
+        }
+      }
+      return;
     }
 
     const dx = this.player.wx - b.wx;
@@ -2244,7 +2586,7 @@ export class SiliconWorldEngine {
 
     if (b.state === 'IDLE') {
       if (dist > 2.4) {
-        const spd = b.phase === 3 ? 2.5 : 1.7;
+        const spd = b.phase >= 2 ? 2.1 : 1.7;
         this.moveWithCollision(b, (dx / dist) * spd * dt, (dy / dist) * spd * dt, 0.55);
       }
       if (b.stateTimer <= 0) {
@@ -2252,7 +2594,7 @@ export class SiliconWorldEngine {
         const roll = Math.random();
         if (roll < 0.42) {
           b.state = 'WINDUP_SLAM';
-          b.stateTimer = b.phase === 3 ? 0.68 : 0.88;
+          b.stateTimer = b.phase >= 2 ? 0.76 : 0.88;
           gameAudio.playBossTelegraph();
           this.telegraphs.push({
             wx: this.player.wx,
@@ -2260,7 +2602,7 @@ export class SiliconWorldEngine {
             radius: 2.2,
             timer: b.stateTimer,
             maxTimer: b.stateTimer,
-            damage: 18,
+            damage: 19,
           });
         } else if (roll < 0.78) {
           b.state = 'WINDUP_FAN';
@@ -2276,34 +2618,35 @@ export class SiliconWorldEngine {
             radius: 3.5,
             timer: b.stateTimer,
             maxTimer: b.stateTimer,
-            damage: 16,
+            damage: 17,
           });
         }
       }
     } else if (b.state === 'WINDUP_SLAM' || b.state === 'WINDUP_RING') {
       if (b.stateTimer <= 0) {
         b.state = 'COOLDOWN';
-        b.stateTimer = b.phase === 3 ? 0.6 : 0.9;
+        b.stateTimer = 0.85;
       }
     } else if (b.state === 'WINDUP_FAN') {
       if (b.stateTimer <= 0) {
-        const count = b.phase === 3 ? 7 : 5;
+        const count = b.phase >= 2 ? 6 : 5;
         const base = Math.atan2(dy, dx);
         for (let k = 0; k < count; k++) {
           const ang = base + (k - (count - 1) / 2) * 0.26;
           this.projectiles.push({
             wx: b.wx,
             wy: b.wy,
-            vx: Math.cos(ang) * (b.phase === 3 ? 6.0 : 5.0),
-            vy: Math.sin(ang) * (b.phase === 3 ? 6.0 : 5.0),
+            vx: Math.cos(ang) * 5.2,
+            vy: Math.sin(ang) * 5.2,
             life: 2.8,
             color: k % 2 === 0 ? '#EC4899' : '#EF4444',
             radius: 0.3,
+            damage: 13,
           });
         }
         gameAudio.playHit(false);
         b.state = 'COOLDOWN';
-        b.stateTimer = b.phase === 3 ? 0.65 : 1.0;
+        b.stateTimer = 0.92;
       }
     } else if (b.state === 'COOLDOWN') {
       if (b.stateTimer <= 0) {
@@ -2325,7 +2668,7 @@ export class SiliconWorldEngine {
         continue;
       }
       if (Math.hypot(p.wx - this.player.wx, p.wy - this.player.wy) < p.radius + 0.36) {
-        this.damagePlayer(11);
+        this.damagePlayer(p.damage ?? 11);
         this.projectiles.splice(i, 1);
       }
     }
@@ -2497,8 +2840,7 @@ export class SiliconWorldEngine {
       const nearNpc = this.findNearestNpc(2.2);
       const nearTask = this.findNearestTask(1.9);
       if (nearNpc) {
-        nearbyPrompt =
-          nearNpc.kind === 'boss_gate' ? '[E] Inspect Colosseum Gate' : `[E] Talk to ${nearNpc.name}`;
+        nearbyPrompt = `[E] Talk to ${nearNpc.name}`;
       } else if (nearTask) {
         nearbyPrompt = `[E / O] Rescue ${nearTask.label}`;
       } else if (nearHw) {
@@ -2507,13 +2849,13 @@ export class SiliconWorldEngine {
     }
 
     const districtNames: Record<DistrictId, string> = {
-      TRAP_ALLEY: 'Bargain Trap Island',
-      ECORE_PARK: 'E-Core Efficiency Park',
-      COPPER_PLAZA: 'Copper Bus Plaza',
-      NPU_LIBRARY: 'NPU Study Monastery',
-      ARC_ARENA: 'Arc XeSS Archery Arena',
-      BOSS_COLOSSEUM: 'Overclocked Colosseum',
-      EXPO_PARK: 'Intel AI PC Expo Park',
+      TRAP_ALLEY: '1:47 AM Study Cove',
+      ECORE_PARK: 'Harbor of Quiet Hours',
+      COPPER_PLAZA: 'Copper Bus Crossroads',
+      NPU_LIBRARY: 'Library of Unspoken Notes',
+      ARC_ARENA: 'Dawn Horizon Arena',
+      BOSS_COLOSSEUM: 'The Burnout Citadel',
+      EXPO_PARK: 'Intel AI PC Courtyard',
     };
 
     const fpsDisplay =
@@ -2525,8 +2867,8 @@ export class SiliconWorldEngine {
 
     const phaseLabels: Record<1 | 2 | 3, string> = {
       1: 'Phase 1 · Black Guard & RGB Shield',
-      2: 'Phase 2 · Black Tower Archery Volley',
-      3: 'Phase 3 · Single-Lane Panic Overload',
+      2: 'Phase 2 · Dark Portals & Fallen Knights',
+      3: 'Phase 3 · 50% Twin Titans Split',
     };
 
     this.callbacks.onHudUpdate({
@@ -2564,12 +2906,15 @@ export class SiliconWorldEngine {
       objectiveText: this.objectiveText,
       nearbyPrompt,
       bossActive: this.boss.active,
-      bossName: 'Black Warlord · Lag Titan',
+      bossName: this.boss.splitActive ? 'Twin Titans · Thermal & Throttle' : 'Black Warlord · Lag Titan',
       bossPhaseLabel: phaseLabels[this.boss.phase],
       bossHp: Math.round(this.boss.hp),
       bossMaxHp: this.boss.maxHp,
       bossShield: Math.round(this.boss.shield),
       bossMaxShield: this.boss.maxShield,
+      twinBosses: this.boss.splitActive
+        ? this.boss.twins.map((t) => ({ name: t.name, hp: Math.round(t.hp), maxHp: t.maxHp }))
+        : undefined,
       bannerText: this.bannerText,
       inExpoPark: this.zone === 'EXPO_PARK',
       matchedPcId: this.matchedPcId,
@@ -2616,6 +2961,13 @@ export class SiliconWorldEngine {
     // 1. Animated Water + 5 Tiny Swords Island Tilemaps + Foam & Cliffs
     this.renderTinySwordsIslands(ctx, atlas, vw, vh);
 
+    // 1B. Custom Ground Architecture: Story Route Lantern Glows (Silicon City) & Hand-Painted Stone Courtyard (Expo Courtyard)
+    if (this.zone === 'EXPO_PARK') {
+      this.drawExpoCourtyardGround(ctx, atlas);
+    } else {
+      this.drawStoryRouteLanternGround(ctx);
+    }
+
     // 2. Water Rocks & Bobbing Rubber Ducks
     for (const wd of this.waterDecos) {
       const px = wd.wx * TILE_SIZE;
@@ -2635,59 +2987,92 @@ export class SiliconWorldEngine {
       ctx.restore();
     }
 
-    // 2B. Cloud Ground Shadows (cast diagonally south-east onto terrain & ocean BELOW tall props/actors)
+    // 2B. Layered Cloud Ground Shadows (cast gently south-east onto terrain & ocean; denser under Boss Storm)
     for (const c of this.clouds) {
       const img = atlas.clouds[c.variant % atlas.clouds.length];
       const shadowImg = this.getCloudShadowCanvas(c.variant, img);
       const dw = 460 * c.scale * 0.72;
       const dh = (img.height / img.width) * dw;
-      const sx = c.wx * TILE_SIZE + 145;
-      const sy = c.wy * TILE_SIZE + 180;
+      const sx = c.wx * TILE_SIZE + (c.layer === 1 ? 165 : 120);
+      const sy = c.wy * TILE_SIZE + (c.layer === 1 ? 195 : 155);
       ctx.save();
-      ctx.globalAlpha = 0.18;
+      ctx.globalAlpha = (c.layer === 1 ? 0.15 : 0.11) + this.stormIntensity * 0.12;
       ctx.drawImage(shadowImg, sx - dw / 2, sy - dh / 2, dw, dh);
       ctx.restore();
     }
 
-    // 3. Signposts
+    // 3. Signposts (clean minimal labels when nearby)
     for (const sp of this.signposts) {
       const px = sp.wx * TILE_SIZE;
       const py = sp.wy * TILE_SIZE;
+      const near = Math.hypot(sp.wx - this.player.wx, sp.wy - this.player.wy) < 4.5;
       ctx.save();
-      ctx.font = '700 11px "Chakra Petch", sans-serif';
-      ctx.textAlign = 'center';
-      const w = ctx.measureText(sp.label).width + 24;
       ctx.fillStyle = '#5c3a25';
-      ctx.strokeStyle = '#d7b887';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(px - w / 2, py - 34, w, 24, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = sp.color;
-      ctx.fillText(sp.label, px, py - 18);
+      ctx.fillRect(px - 3, py - 24, 6, 24);
+      ctx.fillStyle = '#d7b887';
+      ctx.fillRect(px - 10, py - 26, 20, 7);
+      if (near) {
+        ctx.font = '700 11px "Chakra Petch", sans-serif';
+        ctx.textAlign = 'center';
+        const w = ctx.measureText(sp.label).width + 20;
+        ctx.fillStyle = 'rgba(11, 17, 32, 0.88)';
+        ctx.fillRect(px - w / 2, py - 52, w, 20);
+        ctx.fillStyle = sp.color;
+        ctx.fillText(sp.label, px, py - 38);
+      }
       ctx.restore();
     }
 
-    // 4. Boss Floor Telegraphs
+    // 4. Boss Floor Telegraphs (soft radial thermal scorch + animated sprite ember markers — no hard geometric ring)
     for (const t of this.telegraphs) {
       const px = t.wx * TILE_SIZE;
       const py = t.wy * TILE_SIZE;
       const r = t.radius * TILE_SIZE;
       const pct = 1 - t.timer / t.maxTimer;
       ctx.save();
+      const grad = ctx.createRadialGradient(px, py, 6, px, py, r);
+      grad.addColorStop(0, `rgba(239, 68, 68, ${0.14 + pct * 0.24})`);
+      grad.addColorStop(0.7, `rgba(249, 115, 22, ${0.12 + pct * 0.2})`);
+      grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+      ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(px, py, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(239, 68, 68, ${0.2 + pct * 0.3})`;
       ctx.fill();
-      ctx.strokeStyle = '#EF4444';
-      ctx.lineWidth = 3;
-      ctx.stroke();
+
+      const fireSheet = atlas.fx.fire1;
+      const fh = fireSheet.height;
+      const totalF = Math.max(1, Math.round(fireSheet.width / fh));
+      const fIdx = Math.floor(this.elapsed * 14) % totalF;
+      const emberCount = 4;
+      for (let k = 0; k < emberCount; k++) {
+        const ang = this.elapsed * 3.5 + (k * Math.PI * 2) / emberCount;
+        const ex = px + Math.cos(ang) * (r * (1 - pct * 0.45));
+        const ey = py + Math.sin(ang) * (r * (1 - pct * 0.45)) * 0.68;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(fireSheet, fIdx * fh, 0, fh, fh, Math.round(ex - 22), Math.round(ey - 30), 44, 44);
+      }
+      ctx.restore();
+    }
+
+    // 4B. Dark Ground Summoning Portals (swirling obsidian/cyan floor rifts for Fallen Knights)
+    for (const pt of this.boss.portals) {
+      const px = pt.wx * TILE_SIZE;
+      const py = pt.wy * TILE_SIZE;
+      const pct = Math.min(1, pt.elapsed / pt.duration);
+      const openScale = pct < 0.75 ? pct / 0.75 : 1 - (pct - 0.75) / 0.25;
+      const r = 42 * Math.max(0.25, openScale);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(1.25, 0.65);
+      const pg = ctx.createRadialGradient(0, 0, 4, 0, 0, r);
+      pg.addColorStop(0, 'rgba(9, 13, 28, 0.96)');
+      pg.addColorStop(0.55, 'rgba(99, 102, 241, 0.65)');
+      pg.addColorStop(0.82, 'rgba(56, 189, 248, 0.42)');
+      pg.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.fillStyle = pg;
       ctx.beginPath();
-      ctx.arc(px, py, r * pct, 0, Math.PI * 2);
-      ctx.strokeStyle = '#FCA5A5';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
 
@@ -2700,6 +3085,32 @@ export class SiliconWorldEngine {
         sortY: (b.ty + b.th) * TILE_SIZE,
         draw: () => this.drawTinyBuilding(ctx, atlas, b),
       });
+    }
+
+    // Custom Hand-Painted Intel Festival Archways & Courtyard Lanterns in EXPO_PARK
+    if (this.zone === 'EXPO_PARK') {
+      drawList.push({
+        sortY: 5.5 * TILE_SIZE,
+        draw: () => this.drawIntelFestivalArch(ctx, atlas, 14.0, 5.5, 4.4, 'INTEL AI PC COURTYARD'),
+      });
+      drawList.push({
+        sortY: 18.0 * TILE_SIZE,
+        draw: () => this.drawIntelFestivalArch(ctx, atlas, 14.0, 18.0, 3.8, 'CORE ULTRA PAVILION'),
+      });
+      const lanterns = [
+        [6.3, 6.4],
+        [21.7, 6.4],
+        [6.3, 16.4],
+        [21.7, 16.4],
+        [11.2, 16.8],
+        [16.8, 16.8],
+      ];
+      for (const [lx, ly] of lanterns) {
+        drawList.push({
+          sortY: ly * TILE_SIZE,
+          draw: () => this.drawFestivalLantern(ctx, lx, ly),
+        });
+      }
     }
 
     // Living World Props (Trees, Bushes, Gold Stones, Rocks)
@@ -2718,7 +3129,7 @@ export class SiliconWorldEngine {
       });
     }
 
-    // Roaming Animated Sheep
+    // Roaming Animated Sheep (feet grounded at py)
     for (const s of this.sheep) {
       drawList.push({
         sortY: s.wy * TILE_SIZE,
@@ -2731,8 +3142,8 @@ export class SiliconWorldEngine {
               : s.state === 'GRASS'
                 ? atlas.sheepGrass
                 : atlas.sheepIdle;
-          this.drawTinyShadow(ctx, atlas, px, py + 4, 42);
-          this.drawSquareStrip(ctx, sheet, px, py + 10, 74, {
+          this.drawTinyShadow(ctx, atlas, px, py, 36);
+          this.drawSquareStrip(ctx, sheet, px, py + 25, 74, {
             fps: s.state === 'MOVE' ? 10 : 8,
             flipX: s.flipX,
             seed: Math.round(s.wx * 3),
@@ -2741,7 +3152,7 @@ export class SiliconWorldEngine {
       });
     }
 
-    // Living Ecosystem Villagers (Pawns, Monks, Archers, Lancers)
+    // Living Ecosystem Villagers (Pawns, Monks, Archers, Lancers — feet grounded at py)
     for (const v of this.villagers) {
       drawList.push({
         sortY: v.wy * TILE_SIZE,
@@ -2749,10 +3160,11 @@ export class SiliconWorldEngine {
           const px = v.wx * TILE_SIZE;
           const py = v.wy * TILE_SIZE;
           const u = atlas.units[v.faction];
-          this.drawTinyShadow(ctx, atlas, px, py + 4, 48);
           let strip = u.pawnIdle;
           let sizePx = 108;
-          let yOff = 15;
+          let yOff = 32;
+          let shadowW = 42;
+          let shadowXOff = 0;
           if (v.role === 'pawn_gold') {
             strip = v.state === 'MOVE' ? u.pawnRunGold : u.pawnIdleGold;
           } else if (v.role === 'monk') {
@@ -2762,10 +3174,13 @@ export class SiliconWorldEngine {
           } else if (v.role === 'lancer') {
             strip = v.state === 'MOVE' ? u.lancerRun : u.lancerIdle;
             sizePx = 148;
-            yOff = 23;
+            yOff = 56;
+            shadowW = 48;
+            shadowXOff = v.flipX ? 4 : -4;
           } else {
             strip = v.state === 'MOVE' ? u.pawnRun : v.state === 'ACTION' ? u.pawnInteractHammer : u.pawnIdle;
           }
+          this.drawTinyShadow(ctx, atlas, px + shadowXOff, py + 1, shadowW);
           this.drawSquareStrip(ctx, strip, px, py + yOff, sizePx, {
             fps: v.state === 'MOVE' ? 11 : 8,
             flipX: v.flipX,
@@ -2780,7 +3195,7 @@ export class SiliconWorldEngine {
       drawList.push({
         sortY: g.wy * TILE_SIZE - 1,
         draw: () => {
-          this.drawSquareStrip(ctx, atlas.units.Blue.warriorGuard, g.wx * TILE_SIZE, g.wy * TILE_SIZE + 14, 118, {
+          this.drawSquareStrip(ctx, atlas.units.Blue.warriorGuard, g.wx * TILE_SIZE, g.wy * TILE_SIZE + 34, 118, {
             fps: 10,
             flipX: g.flipX,
             alpha: g.alpha * 0.65,
@@ -2789,7 +3204,7 @@ export class SiliconWorldEngine {
       });
     }
 
-    // Trapped AI Tasks -> Rescued Intel AI PCs!
+    // Trapped AI Tasks -> Rescued Intel AI PCs (minimal label only when nearby)
     for (const t of this.tasks) {
       drawList.push({
         sortY: t.wy * TILE_SIZE,
@@ -2797,13 +3212,9 @@ export class SiliconWorldEngine {
           const px = t.wx * TILE_SIZE;
           const py = t.wy * TILE_SIZE;
           const bob = Math.sin(this.elapsed * 4 + t.wx) * 2.5;
+          const near = Math.hypot(t.wx - this.player.wx, t.wy - this.player.wy) < 3.4;
           ctx.save();
-          ctx.strokeStyle = t.rescued ? 'rgba(0, 199, 253, 0.9)' : 'rgba(239, 68, 68, 0.85)';
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.ellipse(px, py + 4, 24, 10, 0, 0, Math.PI * 2);
-          ctx.stroke();
-
+          this.drawTinyShadow(ctx, atlas, px, py + 5, 44);
           if (t.rescued) {
             ctx.drawImage(atlas.intelHardware.aiPc, px - 26, py - 46 + bob * 0.6, 52, 52);
           } else {
@@ -2811,12 +3222,14 @@ export class SiliconWorldEngine {
             this.drawSquareStrip(ctx, hl, px, py + 12 + bob, 68, { fps: 10, seed: t.variant * 5 });
             ctx.drawImage(atlas.intelHardware.trapLaptop, px + 4, py - 34 + bob, 30, 30);
           }
-          ctx.font = '700 11px "Plus Jakarta Sans", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillStyle = INK;
-          ctx.fillText(t.rescued ? `${t.label} · AI PC ✓` : t.label, px + 1, py - 46 + bob);
-          ctx.fillStyle = t.rescued ? '#38BDF8' : '#FCA5A5';
-          ctx.fillText(t.rescued ? `${t.label} · AI PC ✓` : t.label, px, py - 47 + bob);
+          if (near) {
+            ctx.font = '700 11px "Plus Jakarta Sans", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = INK;
+            ctx.fillText(t.rescued ? `${t.label} ✓` : t.label, px + 1, py - 46 + bob);
+            ctx.fillStyle = t.rescued ? '#38BDF8' : '#FCA5A5';
+            ctx.fillText(t.rescued ? `${t.label} ✓` : t.label, px, py - 47 + bob);
+          }
           ctx.restore();
         },
       });
@@ -2840,67 +3253,49 @@ export class SiliconWorldEngine {
           ctx.save();
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(img, px - 22, py - 32 + bob, 44, 44);
-          ctx.font = '700 10px "JetBrains Mono", monospace';
-          ctx.textAlign = 'center';
-          ctx.fillStyle = pk.kind === 'meat' ? '#34D399' : pk.kind === 'gold' ? '#FCD34D' : '#BAE6FD';
-          ctx.fillText(pk.kind === 'meat' ? '+BAT' : pk.kind === 'gold' ? '+GOLD' : '+WOOD', px, py - 36 + bob);
           ctx.restore();
         },
       });
     }
 
-    // Story Mentors & Gates
+    // Story Mentors (clean minimal labels only when nearby)
     for (const n of this.npcs) {
       drawList.push({
         sortY: n.wy * TILE_SIZE,
         draw: () => {
           const px = n.wx * TILE_SIZE;
           const py = n.wy * TILE_SIZE;
-          if (n.kind === 'trap_gate' || n.kind === 'boss_gate') {
-            const towerImg =
-              n.kind === 'trap_gate' ? atlas.buildings.Red.tower : atlas.buildings.Black.tower;
-            ctx.save();
-            ctx.imageSmoothingEnabled = false;
-            this.drawTinyShadow(ctx, atlas, px, py + 6, 80);
-            ctx.drawImage(towerImg, px - 42, py - 120, 84, 130);
-            ctx.font = '700 12px "Chakra Petch", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = INK;
-            ctx.fillText(n.name, px + 1, py - 125);
-            ctx.fillStyle = '#FCA5A5';
-            ctx.fillText(n.name, px, py - 126);
-            ctx.restore();
-            return;
-          }
+          const near = Math.hypot(n.wx - this.player.wx, n.wy - this.player.wy) < 3.4;
 
-          this.drawTinyShadow(ctx, atlas, px, py + 5, 56);
+          this.drawTinyShadow(ctx, atlas, px, py + 1, 46);
           const flipX = this.player.wx < n.wx;
           if (n.kind === 'npu') {
-            this.drawSquareStrip(ctx, atlas.units.Purple.monkHeal, px, py + 16, 118, {
+            this.drawSquareStrip(ctx, atlas.units.Purple.monkHeal, px, py + 34, 118, {
               fps: 10,
               flipX,
             });
           } else if (n.kind === 'arc') {
-            this.drawSquareStrip(ctx, atlas.units.Yellow.archerIdle, px, py + 16, 116, {
+            this.drawSquareStrip(ctx, atlas.units.Yellow.archerIdle, px, py + 34, 116, {
               fps: 10,
               flipX,
             });
           } else {
-            this.drawSquareStrip(ctx, atlas.units.Blue.monkIdle, px, py + 16, 116, {
+            this.drawSquareStrip(ctx, atlas.units.Blue.monkIdle, px, py + 34, 116, {
               fps: 10,
               flipX,
             });
           }
 
-          const near = Math.hypot(n.wx - this.player.wx, n.wy - this.player.wy) < 2.4;
-          ctx.save();
-          ctx.font = '700 12px "Chakra Petch", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillStyle = INK;
-          ctx.fillText(near ? `[E] ${n.name}` : n.name, px + 1, py - 69);
-          ctx.fillStyle = near ? '#F59E0B' : '#FFFFFF';
-          ctx.fillText(near ? `[E] ${n.name}` : n.name, px, py - 70);
-          ctx.restore();
+          if (near) {
+            ctx.save();
+            ctx.font = '700 12px "Chakra Petch", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = INK;
+            ctx.fillText(`[E] ${n.name}`, px + 1, py - 51);
+            ctx.fillStyle = '#FCD34D';
+            ctx.fillText(`[E] ${n.name}`, px, py - 52);
+            ctx.restore();
+          }
         },
       });
     }
@@ -2923,7 +3318,7 @@ export class SiliconWorldEngine {
               ctx.strokeStyle = 'rgba(245, 158, 11, 0.92)';
               ctx.lineWidth = 3;
               ctx.beginPath();
-              ctx.ellipse(px, py + 6, 48, 18, 0, 0, Math.PI * 2);
+              ctx.ellipse(px, py + 2, 48, 18, 0, 0, Math.PI * 2);
               ctx.stroke();
             }
             ctx.restore();
@@ -2932,13 +3327,13 @@ export class SiliconWorldEngine {
             const cycle = (this.elapsed * 1.55 + pc.wx * 0.7) % 2.2;
             const wStrip =
               cycle < 0.85 ? fUnits.warriorAttack1 : cycle < 1.35 ? fUnits.warriorGuard : fUnits.warriorIdle;
-            this.drawTinyShadow(ctx, atlas, px - 22, py + 6, 52);
-            this.drawSquareStrip(ctx, wStrip, px - 22, py + 14, 112, { fps: 10, flipX: false });
+            this.drawTinyShadow(ctx, atlas, px - 22, py + 1, 44);
+            this.drawSquareStrip(ctx, wStrip, px - 22, py + 32, 112, { fps: 10, flipX: false });
 
             const lStrip =
               cycle >= 0.45 && cycle < 1.35 ? fUnits.lancerRightAttack : fUnits.lancerIdle;
-            this.drawTinyShadow(ctx, atlas, px + 24, py + 6, 56);
-            this.drawSquareStrip(ctx, lStrip, px + 24, py + 24, 156, { fps: 10, flipX: true });
+            this.drawTinyShadow(ctx, atlas, px + 29, py + 1, 50);
+            this.drawSquareStrip(ctx, lStrip, px + 24, py + 59, 156, { fps: 10, flipX: true });
 
             if (cycle >= 0.48 && cycle < 1.18) {
               const clashPct = (cycle - 0.48) / 0.7;
@@ -2953,19 +3348,19 @@ export class SiliconWorldEngine {
               const fIdx = Math.min(totalF - 1, Math.floor(clashPct * totalF));
               ctx.save();
               ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(fireSheet, fIdx * fh, 0, fh, fh, Math.round(px - 28), Math.round(py - 56), 56, 56);
+              ctx.drawImage(fireSheet, fIdx * fh, 0, fh, fh, Math.round(px - 28), Math.round(py - 46), 56, 56);
               ctx.restore();
             }
 
             if (isMatch) {
-              this.drawGoldenCrown(ctx, px - 22, py - 68);
+              this.drawGoldenCrown(ctx, px - 22, py - 56);
               ctx.save();
               ctx.font = '700 12px "Chakra Petch", sans-serif';
               ctx.textAlign = 'center';
               ctx.fillStyle = INK;
-              ctx.fillText('★ YOUR BEST MATCH', px + 1, py - 83);
+              ctx.fillText('★ YOUR BEST MATCH', px + 1, py - 71);
               ctx.fillStyle = '#FCD34D';
-              ctx.fillText('★ YOUR BEST MATCH', px, py - 84);
+              ctx.fillText('★ YOUR BEST MATCH', px, py - 72);
               ctx.restore();
             }
 
@@ -2973,16 +3368,16 @@ export class SiliconWorldEngine {
             ctx.font = '700 12px "Chakra Petch", sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = INK;
-            ctx.fillText(near ? `[E] ${pc.name}` : isTagged ? `${pc.name} ★` : pc.name, px + 1, py + 31);
+            ctx.fillText(near ? `[E] ${pc.name}` : isTagged ? `${pc.name} ★` : pc.name, px + 1, py + 23);
             ctx.fillStyle = near ? '#F59E0B' : isTagged ? '#34D399' : '#FFFFFF';
-            ctx.fillText(near ? `[E] ${pc.name}` : isTagged ? `${pc.name} ★` : pc.name, px, py + 30);
+            ctx.fillText(near ? `[E] ${pc.name}` : isTagged ? `${pc.name} ★` : pc.name, px, py + 22);
             ctx.restore();
           },
         });
       }
     }
 
-    // Faction Enemies (Red / Purple / Black Units)
+    // Faction Enemies + Spectral Fallen Knights Rising From Ground Portals
     for (const e of this.enemies) {
       drawList.push({
         sortY: e.wy * TILE_SIZE,
@@ -2990,11 +3385,12 @@ export class SiliconWorldEngine {
           const px = e.wx * TILE_SIZE;
           const py = e.wy * TILE_SIZE;
           const u = atlas.units[e.faction];
-          this.drawTinyShadow(ctx, atlas, px, py + 5, 52);
 
           let strip = u.warriorIdle;
           let sizePx = 114;
-          let yOff = 15;
+          let yOff = 33;
+          let shadowW = 46;
+          let shadowXOff = 0;
           if (e.unitClass === 'red_pawn') {
             strip = e.state === 'LUNGE' ? u.pawnRun : e.state === 'WINDUP' ? u.pawnInteractHammer : u.pawnIdle;
           } else if (e.unitClass.includes('archer')) {
@@ -3002,7 +3398,20 @@ export class SiliconWorldEngine {
           } else if (e.unitClass === 'purple_lancer') {
             strip = e.state === 'LUNGE' ? u.lancerRightAttack : u.lancerIdle;
             sizePx = 160;
-            yOff = 24;
+            yOff = 61;
+            shadowW = 52;
+            shadowXOff = e.flipX ? 5 : -5;
+          } else if (e.unitClass === 'spectral_knight') {
+            strip =
+              e.state === 'LUNGE'
+                ? u.warriorAttack2
+                : e.state === 'WINDUP'
+                  ? u.warriorGuard
+                  : e.state === 'PATROL'
+                    ? u.warriorRun
+                    : u.warriorIdle;
+            sizePx = 118;
+            yOff = 34;
           } else {
             strip =
               e.state === 'LUNGE'
@@ -3012,78 +3421,170 @@ export class SiliconWorldEngine {
                   : u.warriorIdle;
           }
 
-          this.drawSquareStrip(ctx, strip, px, py + yOff, sizePx, {
-            fps: 11,
-            flipX: e.flipX,
-            hitFlash: e.hitFlash > 0,
-            seed: e.id * 3,
-          });
-
-          if (e.state === 'WINDUP') {
-            ctx.strokeStyle = '#EF4444';
-            ctx.lineWidth = 2.5;
+          if (e.isSpectral) {
+            const risePct =
+              e.riseElapsed !== undefined && e.riseDuration
+                ? Math.min(1, e.riseElapsed / e.riseDuration)
+                : 1;
+            // Grounded spectral portal shadow ring while knight rises
+            ctx.save();
+            ctx.translate(px, py + 2);
+            ctx.scale(1.2, 0.58);
+            const pg = ctx.createRadialGradient(0, 0, 2, 0, 0, 28);
+            pg.addColorStop(0, 'rgba(15, 23, 42, 0.72)');
+            pg.addColorStop(0.65, 'rgba(56, 189, 248, 0.32)');
+            pg.addColorStop(1, 'rgba(56, 189, 248, 0)');
+            ctx.fillStyle = pg;
             ctx.beginPath();
-            ctx.arc(px, py - 24, 26, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.arc(0, 0, 28, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            if (risePct < 1) {
+              ctx.beginPath();
+              ctx.rect(px - 70, py - 120, 140, 124);
+              ctx.clip();
+            }
+            const sinkOffset = (1 - risePct) * 64;
+            this.drawSpectralStrip(ctx, strip, px, py + yOff + sinkOffset, sizePx, {
+              fps: 12,
+              flipX: e.flipX,
+              hitFlash: e.hitFlash > 0,
+              alpha: 0.88,
+              seed: e.id * 5,
+            });
+            ctx.restore();
+          } else {
+            this.drawTinyShadow(ctx, atlas, px + shadowXOff, py + 1, shadowW);
+            this.drawSquareStrip(ctx, strip, px, py + yOff, sizePx, {
+              fps: e.state === 'WINDUP' ? 14 : 11,
+              flipX: e.flipX,
+              hitFlash: e.hitFlash > 0,
+              seed: e.id * 3,
+            });
           }
+
+          // Pure sprite-based windup glint at weapon side
+          if (e.state === 'WINDUP') {
+            const sparkSheet = e.isSpectral ? atlas.fx.fire3 : atlas.fx.fire1;
+            const fh = sparkSheet.height;
+            const totalF = Math.max(1, Math.round(sparkSheet.width / fh));
+            const fIdx = Math.floor(this.elapsed * 16 + e.id) % totalF;
+            const sparkX = px + (e.flipX ? -22 : 22);
+            const sparkY = py - 24;
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            ctx.globalAlpha = 0.88;
+            ctx.drawImage(sparkSheet, fIdx * fh, 0, fh, fh, Math.round(sparkX - 18), Math.round(sparkY - 18), 36, 36);
+            ctx.restore();
+          }
+
+          // Slim, borderless micro HP bar only when actively wounded
           if (e.hp < e.maxHp) {
-            ctx.fillStyle = '#0F172A';
-            ctx.fillRect(px - 18, py - 56, 36, 5);
-            ctx.fillStyle = '#EF4444';
-            ctx.fillRect(px - 18, py - 56, Math.max(0, (e.hp / e.maxHp) * 36), 5);
+            const pct = Math.max(0, e.hp / e.maxHp);
+            ctx.save();
+            ctx.fillStyle = 'rgba(11, 17, 32, 0.72)';
+            ctx.beginPath();
+            ctx.roundRect(px - 15, py - 48, 30, 3.5, 2);
+            ctx.fill();
+            ctx.fillStyle = e.isSpectral ? '#38BDF8' : '#EF4444';
+            ctx.beginPath();
+            ctx.roundRect(px - 15, py - 48, 30 * pct, 3.5, 2);
+            ctx.fill();
+            ctx.restore();
           }
         },
       });
     }
 
-    // Giant Black Warrior Lag Titan Boss
+    // Giant Black Warrior Lag Titan Boss -> Splits at 50% HP into Twin Mini-Bosses!
     if (this.zone === 'SILICON_CITY' && this.boss.hp > 0) {
-      for (const d of this.boss.decoys) {
+      const bu = atlas.units.Black;
+      if (this.boss.splitActive) {
+        for (const twin of this.boss.twins) {
+          if (twin.hp <= 0) continue;
+          drawList.push({
+            sortY: twin.wy * TILE_SIZE,
+            draw: () => {
+              const px = twin.wx * TILE_SIZE;
+              const py = twin.wy * TILE_SIZE;
+              this.drawTinyShadow(ctx, atlas, px, py + 2, 76);
+
+              const strip =
+                twin.state === 'WINDUP_SLAM'
+                  ? bu.warriorAttack1
+                  : twin.state === 'WINDUP_FAN'
+                    ? bu.warriorAttack2
+                    : twin.state === 'IDLE'
+                      ? bu.warriorRun
+                      : bu.warriorGuard;
+
+              this.drawSquareStrip(ctx, strip, px, py + 50, 172, {
+                fps: 12,
+                flipX: twin.flipX,
+                hitFlash: twin.hitFlash > 0,
+                seed: twin.id * 7,
+              });
+
+              // Compact twin aura fire FX (sprite only)
+              const wispSheet = twin.id === 1 ? atlas.fx.fire2 : atlas.fx.fire3;
+              const fh = wispSheet.height;
+              const totalF = Math.max(1, Math.round(wispSheet.width / fh));
+              const fIdx = Math.floor(this.elapsed * 14 + twin.id * 3) % totalF;
+              ctx.save();
+              ctx.imageSmoothingEnabled = false;
+              ctx.globalAlpha = 0.72;
+              ctx.drawImage(wispSheet, fIdx * fh, 0, fh, fh, Math.round(px - 22), Math.round(py - 84), 44, 44);
+              ctx.restore();
+            },
+          });
+        }
+      } else {
         drawList.push({
-          sortY: d.wy * TILE_SIZE,
+          sortY: this.boss.wy * TILE_SIZE,
           draw: () => {
-            this.drawSquareStrip(ctx, atlas.units.Black.warriorIdle, d.wx * TILE_SIZE, d.wy * TILE_SIZE + 20, 180, {
-              fps: 10,
-              alpha: 0.45,
+            const px = this.boss.wx * TILE_SIZE;
+            const py = this.boss.wy * TILE_SIZE;
+            this.drawTinyShadow(ctx, atlas, px, py + 2, 108);
+
+            const strip =
+              this.boss.shield > 0 && this.boss.state === 'IDLE'
+                ? bu.warriorGuard
+                : this.boss.state === 'WINDUP_SLAM' || this.boss.state === 'WINDUP_RING'
+                  ? this.boss.attackCombo === 0
+                    ? bu.warriorAttack1
+                    : bu.warriorAttack2
+                  : this.boss.state === 'WINDUP_FAN'
+                    ? bu.warriorAttack2
+                    : bu.warriorIdle;
+
+            this.drawSquareStrip(ctx, strip, px, py + 69, 240, {
+              fps: 11,
+              flipX: this.player.wx < this.boss.wx,
+              hitFlash: this.boss.hitFlash > 0,
             });
+
+            // Orbiting sprite fire3 wisps when RGB Shield is active
+            if (this.boss.shield > 0) {
+              const wispSheet = atlas.fx.fire3;
+              const fh = wispSheet.height;
+              const totalF = Math.max(1, Math.round(wispSheet.width / fh));
+              const fIdx = Math.floor(this.elapsed * 14) % totalF;
+              ctx.save();
+              ctx.imageSmoothingEnabled = false;
+              ctx.globalAlpha = 0.85;
+              for (let k = 0; k < 4; k++) {
+                const ang = this.elapsed * 2.8 + (k * Math.PI) / 2;
+                const wx = px + Math.cos(ang) * 62;
+                const wy = py - 38 + Math.sin(ang) * 32;
+                ctx.drawImage(wispSheet, fIdx * fh, 0, fh, fh, Math.round(wx - 22), Math.round(wy - 22), 44, 44);
+              }
+              ctx.restore();
+            }
           },
         });
       }
-      drawList.push({
-        sortY: this.boss.wy * TILE_SIZE,
-        draw: () => {
-          const px = this.boss.wx * TILE_SIZE;
-          const py = this.boss.wy * TILE_SIZE;
-          const bu = atlas.units.Black;
-          this.drawTinyShadow(ctx, atlas, px, py + 12, 130);
-
-          const strip =
-            this.boss.shield > 0 && this.boss.state === 'IDLE'
-              ? bu.warriorGuard
-              : this.boss.state === 'WINDUP_SLAM' || this.boss.state === 'WINDUP_RING'
-                ? this.boss.attackCombo === 0
-                  ? bu.warriorAttack1
-                  : bu.warriorAttack2
-                : this.boss.state === 'WINDUP_FAN'
-                  ? bu.warriorAttack2
-                  : bu.warriorIdle;
-
-          this.drawSquareStrip(ctx, strip, px, py + 34, 240, {
-            fps: 11,
-            flipX: this.player.wx < this.boss.wx,
-            hitFlash: this.boss.hitFlash > 0,
-          });
-
-          if (this.boss.shield > 0) {
-            const hue = Math.floor(this.elapsed * 180) % 360;
-            ctx.strokeStyle = `hsla(${hue}, 95%, 60%, 0.85)`;
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.arc(px, py - 50, 82, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-        },
-      });
     }
 
     // Byte Hero (Blue Pawn in Act I -> Blue Warrior in Silicon City & Expo Park!)
@@ -3095,7 +3596,7 @@ export class SiliconWorldEngine {
 
         // Ground stagelight pool beneath Byte (broad, ultra-soft wash)
         ctx.save();
-        ctx.translate(px, py + 4);
+        ctx.translate(px, py + 2);
         ctx.scale(1.3, 0.72);
         const poolGrad = ctx.createRadialGradient(0, 0, 18, 0, 0, 155);
         if (this.player.xessBuffTimer > 0) {
@@ -3112,7 +3613,7 @@ export class SiliconWorldEngine {
         ctx.fill();
         ctx.restore();
 
-        this.drawTinyShadow(ctx, atlas, px, py + 5, 56);
+        this.drawTinyShadow(ctx, atlas, px, py + 1, 48);
         const flashAlpha =
           this.player.invulnTimer > 0 && Math.floor(this.elapsed * 18) % 2 === 0 ? 0.5 : 1;
 
@@ -3138,7 +3639,7 @@ export class SiliconWorldEngine {
           }
         }
 
-        this.drawSquareStrip(ctx, strip, px, py + 16, 118, {
+        this.drawSquareStrip(ctx, strip, px, py + 34, 118, {
           fps,
           flipX: this.player.flipX,
           hitFlash: this.player.hitFlash > 0,
@@ -3165,7 +3666,7 @@ export class SiliconWorldEngine {
           ctx.strokeStyle = 'rgba(34, 211, 238, 0.85)';
           ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.ellipse(px, py + 4, 32, 13, 0, 0, Math.PI * 2);
+          ctx.ellipse(px, py + 2, 32, 13, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
       },
@@ -3174,20 +3675,7 @@ export class SiliconWorldEngine {
     drawList.sort((a, b) => a.sortY - b.sortY);
     for (const item of drawList) item.draw();
 
-    // 6. Slashes, Arrows/Projectiles, Tiny Swords Sprite FX, Particles & Floating Text
-    for (const sl of this.slashes) {
-      const px = sl.wx * TILE_SIZE;
-      const py = sl.wy * TILE_SIZE - 22;
-      const pct = sl.timer / sl.maxTimer;
-      ctx.save();
-      ctx.strokeStyle = sl.color;
-      ctx.globalAlpha = pct;
-      ctx.lineWidth = 10 * pct + 3;
-      ctx.beginPath();
-      ctx.arc(px, py, sl.radius * 32, sl.angle - 1.05, sl.angle + 1.05);
-      ctx.stroke();
-      ctx.restore();
-    }
+    // 6. Arrows/Projectiles, Tiny Swords Sprite FX, Particles & Floating Text (zero thick arc shapes)
 
     for (const p of this.projectiles) {
       const px = p.wx * TILE_SIZE;
@@ -3236,17 +3724,19 @@ export class SiliconWorldEngine {
       ctx.restore();
     }
 
-    // 7. Large Camera-Near Overhead Clouds (closer to the top-down eye with subtle parallax!)
+    // 7. Doubled Overhead Clouds across 2 gentle parallax drift bands (storm-tinted on Boss Island)
     for (const c of this.clouds) {
-      const img = atlas.clouds[c.variant % atlas.clouds.length];
+      const baseImg = atlas.clouds[c.variant % atlas.clouds.length];
+      const img = this.stormIntensity > 0.45 ? this.getStormCloudCanvas(c.variant, baseImg) : baseImg;
       const baseX = c.wx * TILE_SIZE;
       const baseY = c.wy * TILE_SIZE;
-      const cx = baseX + (baseX - this.camX) * 0.16;
-      const cy = baseY + (baseY - this.camY) * 0.16;
-      const dw = 480 * c.scale;
+      const parallax = c.layer === 1 ? 0.18 : 0.11;
+      const cx = baseX + (baseX - this.camX) * parallax;
+      const cy = baseY + (baseY - this.camY) * parallax;
+      const dw = 480 * c.scale * (1 + this.stormIntensity * 0.14);
       const dh = (img.height / img.width) * dw;
       ctx.save();
-      ctx.globalAlpha = 0.78;
+      ctx.globalAlpha = (c.layer === 1 ? 0.78 : 0.56) + this.stormIntensity * 0.14;
       ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
       ctx.restore();
     }
@@ -3270,80 +3760,234 @@ export class SiliconWorldEngine {
   ): void {
     if (vw <= 0 || vh <= 0 || this.canvas.width <= 0 || this.canvas.height <= 0) return;
 
-    // 1. Wide, ultra-smooth peripheral depth blur (keeps a broad clear field around Byte)
-    const bw = Math.max(180, Math.round(vw * 0.3));
-    const bh = Math.max(100, Math.round(vh * 0.3));
-    if (!this.blurCanvas) {
-      this.blurCanvas = document.createElement('canvas');
-      this.blurCtx = this.blurCanvas.getContext('2d');
+    const isTrap = dist === 'TRAP_ALLEY' && !this.trapCompleted;
+    const isBoss = dist === 'BOSS_COLOSSEUM' || this.stormIntensity > 0.25;
+
+    // Crisp sunlit clarity in Silicon City; restrained edge depth only in Trap / Boss zones
+    if (isTrap || isBoss) {
+      const bw = Math.max(180, Math.round(vw * 0.28));
+      const bh = Math.max(100, Math.round(vh * 0.28));
+      if (!this.blurCanvas) {
+        this.blurCanvas = document.createElement('canvas');
+        this.blurCtx = this.blurCanvas.getContext('2d');
+      }
+      if (this.blurCanvas.width !== bw || this.blurCanvas.height !== bh) {
+        this.blurCanvas.width = bw;
+        this.blurCanvas.height = bh;
+      }
+
+      const bctx = this.blurCtx;
+      if (bctx) {
+        bctx.save();
+        bctx.globalCompositeOperation = 'source-over';
+        bctx.fillStyle = '#070d1a';
+        bctx.fillRect(0, 0, bw, bh);
+        bctx.filter = 'blur(1.5px)';
+        bctx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height, 0, 0, bw, bh);
+        bctx.filter = 'none';
+
+        bctx.globalCompositeOperation = 'destination-out';
+        const sx = heroSx * (bw / vw);
+        const sy = heroSy * (bh / vh);
+        const bDiag = Math.hypot(bw, bh);
+        const eraseGrad = bctx.createRadialGradient(sx, sy, bDiag * 0.34, sx, sy, bDiag * 0.94);
+        eraseGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        eraseGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.55)');
+        eraseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        bctx.fillStyle = eraseGrad;
+        bctx.fillRect(0, 0, bw, bh);
+        bctx.restore();
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.globalAlpha = isTrap ? 1 : Math.max(0.25, this.stormIntensity);
+        ctx.drawImage(this.blurCanvas, 0, 0, bw, bh, 0, 0, vw, vh);
+        ctx.restore();
+      }
     }
-    if (this.blurCanvas.width !== bw || this.blurCanvas.height !== bh) {
-      this.blurCanvas.width = bw;
-      this.blurCanvas.height = bh;
-    }
 
-    const bctx = this.blurCtx;
-    if (bctx) {
-      bctx.save();
-      bctx.globalCompositeOperation = 'source-over';
-      bctx.fillStyle = '#070d1a';
-      bctx.fillRect(0, 0, bw, bh);
-      bctx.filter = 'blur(2px)';
-      bctx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height, 0, 0, bw, bh);
-      bctx.filter = 'none';
+    // Distinct Per-Island Weather & Atmospheric Glaze (immediately visible when crossing bridges)
+    const wTrap = this.weatherMix.TRAP_ALLEY;
+    const wEcore = this.weatherMix.ECORE_PARK;
+    const wPlaza = this.weatherMix.COPPER_PLAZA;
+    const wNpu = this.weatherMix.NPU_LIBRARY;
+    const wArc = this.weatherMix.ARC_ARENA;
+    const wBoss = Math.max(this.stormIntensity, this.weatherMix.BOSS_COLOSSEUM);
+    const wExpo = this.weatherMix.EXPO_PARK;
 
-      // Smooth wide diagonal fade so blur stretches gently toward outer corners
-      bctx.globalCompositeOperation = 'destination-out';
-      const sx = heroSx * (bw / vw);
-      const sy = heroSy * (bh / vh);
-      const bDiag = Math.hypot(bw, bh);
-      const clearR = bDiag * 0.27;
-      const blurFullR = bDiag * 0.9;
-      const eraseGrad = bctx.createRadialGradient(sx, sy, clearR, sx, sy, blurFullR);
-      eraseGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-      eraseGrad.addColorStop(0.18, 'rgba(0, 0, 0, 0.94)');
-      eraseGrad.addColorStop(0.38, 'rgba(0, 0, 0, 0.78)');
-      eraseGrad.addColorStop(0.58, 'rgba(0, 0, 0, 0.54)');
-      eraseGrad.addColorStop(0.78, 'rgba(0, 0, 0, 0.28)');
-      eraseGrad.addColorStop(0.92, 'rgba(0, 0, 0, 0.09)');
-      eraseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      bctx.fillStyle = eraseGrad;
-      bctx.fillRect(0, 0, bw, bh);
-      bctx.restore();
-
+    // 1) Study Cove (1:47 AM Dark Midnight Smog + Rising Embers)
+    if (wTrap > 0.04) {
       ctx.save();
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(this.blurCanvas, 0, 0, bw, bh, 0, 0, vw, vh);
+      ctx.fillStyle = `rgba(18, 11, 28, ${0.34 * wTrap})`;
+      ctx.fillRect(0, 0, vw, vh);
+      for (let i = 0; i < 24; i++) {
+        const m = this.weatherMotes[i];
+        const mx = m.x * vw;
+        const my = m.y * vh;
+        const pulse = 0.45 + 0.55 * Math.sin(this.elapsed * 4 + m.phase);
+        ctx.fillStyle = i % 2 === 0 ? `rgba(251, 146, 60, ${0.58 * pulse * wTrap})` : `rgba(248, 113, 113, ${0.5 * pulse * wTrap})`;
+        ctx.beginPath();
+        ctx.arc(mx, my, m.size * 0.85, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 2) Harbor of Quiet Hours (Crisp Morning Sunbeams + Meadow Mist & Pollen)
+    if (wEcore > 0.04) {
+      ctx.save();
+      const beamGrad = ctx.createLinearGradient(0, 0, vw * 0.65, vh * 0.75);
+      beamGrad.addColorStop(0, `rgba(254, 249, 195, ${0.22 * wEcore})`);
+      beamGrad.addColorStop(0.55, `rgba(187, 247, 208, ${0.1 * wEcore})`);
+      beamGrad.addColorStop(1, 'rgba(254, 249, 195, 0)');
+      ctx.fillStyle = beamGrad;
+      ctx.fillRect(0, 0, vw, vh);
+
+      for (let i = 0; i < 26; i++) {
+        const m = this.weatherMotes[i];
+        ctx.fillStyle = `rgba(254, 240, 138, ${0.42 * wEcore})`;
+        ctx.beginPath();
+        ctx.arc(m.x * vw, m.y * vh, m.size * 0.75, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 3) Copper Bus Plaza (Warm Brisk Midday Breeze + Golden Sparks)
+    if (wPlaza > 0.04) {
+      ctx.save();
+      ctx.fillStyle = `rgba(253, 230, 138, ${0.07 * wPlaza})`;
+      ctx.fillRect(0, 0, vw, vh);
+      for (let i = 10; i < 32; i++) {
+        const m = this.weatherMotes[i];
+        ctx.fillStyle = `rgba(251, 191, 36, ${0.44 * wPlaza})`;
+        ctx.beginPath();
+        ctx.ellipse(m.x * vw, m.y * vh, m.size * 1.4, m.size * 0.55, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 4) Library of Unspoken Notes (Twilight Indigo Overcast + Gentle Drizzle + Glowing Fireflies)
+    if (wNpu > 0.04) {
+      ctx.save();
+      ctx.fillStyle = `rgba(30, 22, 66, ${0.26 * wNpu})`;
+      ctx.fillRect(0, 0, vw, vh);
+
+      // Soft twilight drizzle
+      ctx.strokeStyle = `rgba(196, 181, 253, ${0.24 * wNpu})`;
+      ctx.lineWidth = 1.05;
+      ctx.beginPath();
+      for (let i = 0; i < this.rainDrops.length; i += 2) {
+        const rd = this.rainDrops[i];
+        const rx = rd.x * vw;
+        const ry = rd.y * vh;
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(rx - rd.len * 0.16, ry + rd.len * 0.7);
+      }
+      ctx.stroke();
+
+      // Glowing lavender/cyan fireflies
+      for (let i = 0; i < 24; i++) {
+        const m = this.weatherMotes[i];
+        const glow = 0.4 + 0.6 * Math.sin(this.elapsed * 3.2 + m.phase);
+        const fx = m.x * vw;
+        const fy = m.y * vh;
+        ctx.fillStyle = i % 2 === 0 ? `rgba(103, 232, 249, ${0.68 * glow * wNpu})` : `rgba(216, 180, 254, ${0.68 * glow * wNpu})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, m.size * 0.95, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 5) Dawn Horizon Arena (Golden-Orange Sunset Sky + Fast Wind Gust Streaks)
+    if (wArc > 0.04) {
+      ctx.save();
+      const sunsetGrad = ctx.createLinearGradient(vw, 0, 0, vh);
+      sunsetGrad.addColorStop(0, `rgba(249, 115, 22, ${0.28 * wArc})`);
+      sunsetGrad.addColorStop(0.5, `rgba(245, 158, 11, ${0.14 * wArc})`);
+      sunsetGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = sunsetGrad;
+      ctx.fillRect(0, 0, vw, vh);
+
+      ctx.strokeStyle = `rgba(253, 224, 71, ${0.28 * wArc})`;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (let i = 0; i < 22; i++) {
+        const m = this.weatherMotes[i];
+        const wx = m.x * vw;
+        const wy = m.y * vh;
+        ctx.moveTo(wx, wy);
+        ctx.lineTo(wx - 28 - (i % 3) * 14, wy + 4);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 6) Burnout Citadel (Boss Island Storm: Heavy Rain + Dark Storm Pallor + Branching Lightning)
+    if (wBoss > 0.04) {
+      ctx.save();
+      ctx.fillStyle = `rgba(9, 17, 36, ${0.32 * wBoss})`;
+      ctx.fillRect(0, 0, vw, vh);
+
+      ctx.strokeStyle = `rgba(186, 230, 253, ${0.34 * wBoss})`;
+      ctx.lineWidth = 1.35;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const rd of this.rainDrops) {
+        const rx = rd.x * vw;
+        const ry = rd.y * vh;
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(rx - rd.len * 0.34, ry + rd.len);
+      }
+      ctx.stroke();
+
+      if (this.lightningFlash > 0.02) {
+        const boltX = vw * (0.2 + ((this.lightningSeed % 60) / 100));
+        ctx.strokeStyle = `rgba(224, 242, 254, ${this.lightningFlash * 0.92})`;
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(boltX, 0);
+        ctx.lineTo(boltX - 18, vh * 0.14);
+        ctx.lineTo(boltX + 14, vh * 0.24);
+        ctx.lineTo(boltX - 24, vh * 0.42);
+        ctx.stroke();
+
+        ctx.fillStyle = `rgba(224, 242, 254, ${this.lightningFlash * 0.26})`;
+        ctx.fillRect(0, 0, vw, vh);
+      }
+      ctx.restore();
+    }
+
+    // 7) Post-Boss Festival Courtyard (Clear Radiant Dawn Warmth)
+    if (wExpo > 0.04) {
+      ctx.save();
+      const dawnGrad = ctx.createRadialGradient(vw * 0.5, vh * 0.18, 40, vw * 0.5, vh * 0.5, Math.hypot(vw, vh) * 0.65);
+      dawnGrad.addColorStop(0, `rgba(254, 240, 138, ${0.14 * wExpo})`);
+      dawnGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+      ctx.fillStyle = dawnGrad;
+      ctx.fillRect(0, 0, vw, vh);
       ctx.restore();
     }
 
     const vDiag = Math.hypot(vw, vh);
 
-    // 2. Wide, ultra-soft ambient stagelight wash across the arena (no concentrated spotlight disc)
-    const spotRadius = vDiag * 0.52;
-    const spotGlow = ctx.createRadialGradient(heroSx, heroSy, 28, heroSx, heroSy, spotRadius);
-    spotGlow.addColorStop(0, 'rgba(255, 250, 232, 0.065)');
-    spotGlow.addColorStop(0.35, 'rgba(224, 242, 254, 0.032)');
-    spotGlow.addColorStop(0.72, 'rgba(186, 230, 253, 0.01)');
+    // Warm sunlit daylight ambient lift around hero
+    const spotGlow = ctx.createRadialGradient(heroSx, heroSy, 28, heroSx, heroSy, vDiag * 0.55);
+    spotGlow.addColorStop(0, 'rgba(255, 252, 240, 0.07)');
+    spotGlow.addColorStop(0.5, 'rgba(224, 242, 254, 0.025)');
     spotGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = spotGlow;
     ctx.fillRect(0, 0, vw, vh);
 
-    // 3. Single unified, broad, gradual vignette extending cleanly past the screen corners
-    const isTrap = dist === 'TRAP_ALLEY' && !this.trapCompleted;
-    const isBoss = dist === 'BOSS_COLOSSEUM';
-    const rInner = vDiag * 0.22;
-    const rOuter = vDiag * 0.92;
-    const darkVig = ctx.createRadialGradient(heroSx, heroSy, rInner, heroSx, heroSy, rOuter);
+    // Balanced peripheral framing
+    const darkVig = ctx.createRadialGradient(heroSx, heroSy, vDiag * 0.32, heroSx, heroSy, vDiag * 0.96);
     darkVig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    darkVig.addColorStop(0.18, isTrap ? 'rgba(42, 8, 14, 0.04)' : 'rgba(6, 10, 22, 0.03)');
-    darkVig.addColorStop(0.38, isTrap ? 'rgba(46, 9, 16, 0.12)' : 'rgba(5, 8, 20, 0.09)');
-    darkVig.addColorStop(0.58, isTrap ? 'rgba(42, 7, 14, 0.24)' : 'rgba(4, 7, 18, 0.20)');
-    darkVig.addColorStop(0.78, isTrap ? 'rgba(32, 5, 11, 0.40)' : 'rgba(3, 6, 16, 0.35)');
-    darkVig.addColorStop(0.92, isTrap ? 'rgba(24, 4, 9, 0.54)' : 'rgba(2, 5, 14, 0.48)');
+    darkVig.addColorStop(0.58, isTrap ? 'rgba(42, 7, 14, 0.16)' : 'rgba(6, 12, 24, 0.07)');
     darkVig.addColorStop(
       1,
-      isTrap ? 'rgba(18, 3, 7, 0.64)' : isBoss ? 'rgba(2, 5, 14, 0.66)' : 'rgba(2, 5, 14, 0.58)'
+      isTrap ? 'rgba(18, 3, 7, 0.52)' : isBoss ? 'rgba(2, 5, 14, 0.54)' : 'rgba(6, 14, 28, 0.24)'
     );
     ctx.fillStyle = darkVig;
     ctx.fillRect(0, 0, vw, vh);
@@ -3447,17 +4091,6 @@ export class SiliconWorldEngine {
         const row = !nU ? 0 : !nD ? 2 : 1;
         ctx.drawImage(sheet, col * 64, row * 64, 64, 64, px, py, TILE_SIZE, TILE_SIZE);
 
-        // Copper Bus silicon circuit traces connecting islands
-        if (
-          this.zone === 'SILICON_CITY' &&
-          (g === 3 || g === 2 || g === 4 || g === 5) &&
-          ((tx === 32 && ty >= 17 && ty <= 38) || (ty === 24 && tx >= 18 && tx <= 46))
-        ) {
-          ctx.fillStyle = 'rgba(0, 199, 253, 0.24)';
-          if (tx === 32) ctx.fillRect(px + TILE_SIZE / 2 - 2, py, 4, TILE_SIZE);
-          if (ty === 24) ctx.fillRect(px, py + TILE_SIZE / 2 - 2, TILE_SIZE, 4);
-        }
-
         // Subtle district glaze on Trap Alley & Colosseum
         if (g === 1) {
           ctx.fillStyle = 'rgba(153, 27, 27, 0.16)';
@@ -3465,12 +4098,6 @@ export class SiliconWorldEngine {
         } else if (g === 6) {
           ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-        } else if (g === 9) {
-          const pulse = 0.32 + Math.sin(this.elapsed * 5) * 0.14;
-          ctx.fillStyle = `rgba(239, 68, 68, ${pulse})`;
-          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          ctx.fillStyle = '#FCA5A5';
-          ctx.fillRect(px + 2, py + TILE_SIZE / 2 - 3, TILE_SIZE - 4, 6);
         }
       }
     }
@@ -3495,6 +4122,23 @@ export class SiliconWorldEngine {
     return c;
   }
 
+  private getStormCloudCanvas(variant: number, img: HTMLImageElement): HTMLCanvasElement {
+    const existing = this.stormCloudCache.get(variant);
+    if (existing) return existing;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, img.width);
+    c.height = Math.max(1, img.height);
+    const sctx = c.getContext('2d');
+    if (sctx) {
+      sctx.drawImage(img, 0, 0);
+      sctx.globalCompositeOperation = 'source-atop';
+      sctx.fillStyle = 'rgba(30, 41, 59, 0.56)';
+      sctx.fillRect(0, 0, c.width, c.height);
+    }
+    this.stormCloudCache.set(variant, c);
+    return c;
+  }
+
   private drawIntelHardwareProp(
     ctx: CanvasRenderingContext2D,
     atlas: TinySwordsAtlas,
@@ -3502,53 +4146,244 @@ export class SiliconWorldEngine {
   ): void {
     const px = ip.wx * TILE_SIZE;
     const py = ip.wy * TILE_SIZE;
-    const near = Math.hypot(ip.wx - this.player.wx, ip.wy - this.player.wy) < 2.35;
-    const bob = ip.kind === 'booth' ? 0 : Math.sin(this.elapsed * 2.6 + ip.wx) * 1.5;
+    const near = Math.hypot(ip.wx - this.player.wx, ip.wy - this.player.wy) < 2.65;
+    const isCustomStall = ip.kind.startsWith('stall');
+    const isBooth = ip.kind === 'booth';
+    const bob = isCustomStall || isBooth ? 0 : Math.sin(this.elapsed * 2.6 + ip.wx) * 1.5;
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = !isCustomStall;
 
-    if (near) {
-      ctx.strokeStyle = ip.accent;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.ellipse(px, py + 5, ip.kind === 'booth' ? 54 : 30, ip.kind === 'booth' ? 18 : 11, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    if (ip.kind === 'booth') {
+    if (isCustomStall) {
+      const img =
+        ip.kind === 'stallStudent'
+          ? atlas.courtyard.stallStudent
+          : ip.kind === 'stallGaming'
+            ? atlas.courtyard.stallGaming
+            : atlas.courtyard.stallCreator;
+      const w = 158;
+      const h = Math.round((img.height / Math.max(1, img.width)) * w);
+      this.drawTinyShadow(ctx, atlas, px, py + 8, 134);
+      ctx.drawImage(img, Math.round(px - w / 2), Math.round(py - h + 20), w, h);
+    } else if (isBooth) {
       const img = atlas.intelHardware.booth;
-      const w = 136;
+      const w = 134;
       const h = Math.round((img.height / img.width) * w);
-      this.drawTinyShadow(ctx, atlas, px, py + 7, 126);
-      ctx.drawImage(img, Math.round(px - w / 2), Math.round(py - h + 16), w, h);
-    } else if (ip.kind === 'chip') {
-      const img = atlas.intelHardware.chip;
-      this.drawTinyShadow(ctx, atlas, px, py + 6, 52);
-      ctx.drawImage(img, Math.round(px - 27), Math.round(py - 46 + bob), 54, 54);
-    } else if (ip.kind === 'aiPc') {
-      const img = atlas.intelHardware.aiPc;
-      this.drawTinyShadow(ctx, atlas, px, py + 6, 52);
-      ctx.drawImage(img, Math.round(px - 28), Math.round(py - 46 + bob), 56, 56);
+      this.drawTinyShadow(ctx, atlas, px, py + 7, 122);
+      ctx.drawImage(img, Math.round(px - w / 2), Math.round(py - h + 14), w, h);
     } else {
-      const img = atlas.intelHardware.trapLaptop;
-      this.drawTinyShadow(ctx, atlas, px, py + 6, 52);
-      ctx.drawImage(img, Math.round(px - 28), Math.round(py - 46 + bob), 56, 56);
+      const pw = 66;
+      const ph = 20;
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.roundRect(Math.round(px - pw / 2), Math.round(py - ph / 2 + 5), pw, ph, 7);
+      ctx.fill();
+      ctx.strokeStyle = this.zone === 'EXPO_PARK' ? '#00C7FD' : ip.accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(Math.round(px - pw / 2 + 1), Math.round(py - ph / 2 + 4), pw - 2, ph - 3, 6);
+      ctx.stroke();
+      ctx.fillStyle = '#1E293B';
+      ctx.beginPath();
+      ctx.roundRect(Math.round(px - pw / 2 + 4), Math.round(py - ph / 2 + 3), pw - 8, ph - 6, 5);
+      ctx.fill();
+
+      if (ip.kind === 'chip') {
+        const img = atlas.intelHardware.chip;
+        this.drawTinyShadow(ctx, atlas, px, py + 6, 48);
+        ctx.drawImage(img, Math.round(px - 26), Math.round(py - 48 + bob), 52, 52);
+      } else if (ip.kind === 'aiPc') {
+        const img = atlas.intelHardware.aiPc;
+        this.drawTinyShadow(ctx, atlas, px, py + 6, 48);
+        ctx.drawImage(img, Math.round(px - 27), Math.round(py - 48 + bob), 54, 54);
+      } else {
+        const img = atlas.intelHardware.trapLaptop;
+        this.drawTinyShadow(ctx, atlas, px, py + 6, 48);
+        ctx.drawImage(img, Math.round(px - 27), Math.round(py - 48 + bob), 54, 54);
+      }
     }
 
-    // Crisp Intel hardware interactive nameplate
-    ctx.font = '700 10px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    const lw = ctx.measureText(ip.label).width + 14;
-    const labelY = py + 13;
-    ctx.fillStyle = near ? 'rgba(0, 85, 155, 0.96)' : 'rgba(11, 17, 32, 0.88)';
-    ctx.strokeStyle = near ? '#FDE68A' : ip.accent;
-    ctx.lineWidth = near ? 2 : 1.5;
+    // Minimal nameplate shown only when Byte approaches within proximity
+    if (near) {
+      ctx.font = '700 10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      const lw = ctx.measureText(ip.label).width + 14;
+      const labelY = py + 16;
+      ctx.fillStyle = 'rgba(0, 85, 155, 0.94)';
+      ctx.strokeStyle = '#BAE6FD';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(px - lw / 2, labelY, lw, 17, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillText(ip.label, px, labelY + 12);
+    }
+    ctx.restore();
+  }
+
+  private drawStoryRouteLanternGround(ctx: CanvasRenderingContext2D): void {
+    // Warm guiding lantern pools along bridges & crossroads + quiet midnight study lamp on Study Cove
+    const spots: { wx: number; wy: number; color: string; r: number }[] = [
+      { wx: 6.5, wy: 29.0, color: 'rgba(251, 191, 36, 0.2)', r: 85 }, // 1:47 AM desk lamp aura
+      { wx: 14.5, wy: 28.0, color: 'rgba(56, 189, 248, 0.16)', r: 70 }, // Bridge beacon
+      { wx: 23.5, wy: 27.5, color: 'rgba(16, 185, 129, 0.14)', r: 95 }, // Harbor of Quiet Hours
+      { wx: 23.5, wy: 16.0, color: 'rgba(0, 199, 253, 0.16)', r: 120 }, // Copper Plaza hub
+      { wx: 8.0, wy: 15.8, color: 'rgba(168, 85, 247, 0.15)', r: 90 }, // Library of Unspoken Notes
+      { wx: 38.0, wy: 15.8, color: 'rgba(245, 158, 11, 0.15)', r: 90 }, // Dawn Horizon Arena
+    ];
+    ctx.save();
+    for (const s of spots) {
+      const px = s.wx * TILE_SIZE;
+      const py = s.wy * TILE_SIZE;
+      const grad = ctx.createRadialGradient(px, py, 6, px, py, s.r);
+      grad.addColorStop(0, s.color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px, py, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawExpoCourtyardGround(ctx: CanvasRenderingContext2D, atlas: TinySwordsAtlas): void {
+    const cx = 14.0 * TILE_SIZE;
+    const cy = 11.2 * TILE_SIZE;
+    const stonePathImg = atlas.courtyard.stonePath;
+    const stonePlazaImg = atlas.courtyard.stonePlaza;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+
+    const drawPathStone = (wx: number, wy: number, w = 86, h = 62) => {
+      const px = Math.round(wx * TILE_SIZE - w / 2);
+      const py = Math.round(wy * TILE_SIZE - h / 2);
+      ctx.drawImage(stonePathImg, px, py, w, h);
+    };
+
+    // 1. Hand-painted warm sandstone arrival walkway from Southern Entrance Arch into Central Plaza
+    for (let wy = 17.5; wy >= 13.0; wy -= 1.05) {
+      drawPathStone(14.0, wy, 92, 66);
+    }
+
+    // 2. Stepped stone courtyard paths linking Center Plaza to Student, Creator, Gaming stalls & Champions
+    const stoneWalkways: [number, number][] = [
+      // West wings toward Student Stall & FeatherAir
+      [11.6, 11.2],
+      [9.6, 11.0],
+      [9.4, 9.6],
+      [7.4, 9.4],
+      [7.2, 13.6],
+      // East wings toward Creator & Gaming Stalls & Canvas Studio
+      [16.4, 11.2],
+      [18.6, 11.0],
+      [18.6, 9.6],
+      [20.6, 11.0],
+      [20.8, 13.6],
+      // North avenue toward FlowCraft Pro
+      [14.0, 8.2],
+      [14.0, 7.0],
+    ];
+    for (const [wx, wy] of stoneWalkways) {
+      drawPathStone(wx, wy, 82, 58);
+    }
+
+    // 3. Central Hand-Painted Octagonal Carved Stone & Cobalt Circuit Plaza Mosaic
+    const plazaW = 246;
+    const plazaH = Math.round((stonePlazaImg.height / Math.max(1, stonePlazaImg.width)) * plazaW);
+    const pulseGrad = ctx.createRadialGradient(cx, cy, 24, cx, cy, 148);
+    pulseGrad.addColorStop(0, 'rgba(0, 199, 253, 0.18)');
+    pulseGrad.addColorStop(1, 'rgba(0, 199, 253, 0)');
+    ctx.fillStyle = pulseGrad;
     ctx.beginPath();
-    ctx.roundRect(px - lw / 2, labelY, lw, 17, 4);
+    ctx.arc(cx, cy, 148, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = near ? '#FEF3C7' : '#F8FAFC';
-    ctx.fillText(ip.label, px, labelY + 12);
+
+    ctx.drawImage(
+      stonePlazaImg,
+      Math.round(cx - plazaW / 2),
+      Math.round(cy - plazaH / 2),
+      plazaW,
+      plazaH
+    );
+
+    ctx.restore();
+  }
+
+  private drawIntelFestivalArch(
+    ctx: CanvasRenderingContext2D,
+    atlas: TinySwordsAtlas,
+    wx: number,
+    wy: number,
+    spanTiles: number,
+    title: string
+  ): void {
+    const cx = wx * TILE_SIZE;
+    const baseY = wy * TILE_SIZE;
+    const archImg = atlas.courtyard.festivalArch;
+    const targetW = Math.max(210, Math.round(spanTiles * TILE_SIZE + 54));
+    const targetH = Math.round((archImg.height / Math.max(1, archImg.width)) * targetW);
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+
+    // Grounded pier shadows
+    this.drawTinyShadow(ctx, atlas, cx - targetW * 0.34, baseY + 3, 56);
+    this.drawTinyShadow(ctx, atlas, cx + targetW * 0.34, baseY + 3, 56);
+
+    ctx.drawImage(archImg, Math.round(cx - targetW / 2), Math.round(baseY - targetH + 14), targetW, targetH);
+
+    // Subtle carved wood title plate only when nearby
+    if (Math.hypot(wx - this.player.wx, wy - this.player.wy) < 5.8) {
+      ctx.font = '700 10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      const lw = ctx.measureText(title).width + 18;
+      const py = Math.round(baseY - targetH + 10);
+      ctx.fillStyle = 'rgba(24, 16, 12, 0.9)';
+      ctx.strokeStyle = '#D97706';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(cx - lw / 2, py, lw, 17, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#FEF3C7';
+      ctx.fillText(title, cx, py + 12);
+    }
+
+    ctx.restore();
+  }
+
+  private drawFestivalLantern(ctx: CanvasRenderingContext2D, wx: number, wy: number): void {
+    const px = wx * TILE_SIZE;
+    const py = wy * TILE_SIZE;
+    const glow = 0.75 + Math.sin(this.elapsed * 3.5 + wx) * 0.2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(9, 17, 30, 0.25)';
+    ctx.beginPath();
+    ctx.ellipse(px, py + 2, 10, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Post
+    ctx.fillStyle = '#1E293B';
+    ctx.fillRect(px - 3, py - 44, 6, 44);
+    ctx.fillStyle = '#0068B5';
+    ctx.fillRect(px - 7, py - 46, 14, 4);
+
+    // Warm festival orb
+    const g = ctx.createRadialGradient(px, py - 52, 2, px, py - 52, 24);
+    g.addColorStop(0, `rgba(253, 224, 71, ${0.55 * glow})`);
+    g.addColorStop(0.5, `rgba(0, 199, 253, ${0.22 * glow})`);
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(px, py - 52, 24, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FDE047';
+    ctx.beginPath();
+    ctx.arc(px, py - 52, 6, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
@@ -3577,19 +4412,22 @@ export class SiliconWorldEngine {
     this.drawTinyShadow(ctx, atlas, cx, bottomY + 4, targetW * 0.92);
     ctx.drawImage(img, Math.round(cx - targetW / 2), Math.round(bottomY - targetH + 8), targetW, targetH);
 
-    // Subtle wooden nameplate below building
-    ctx.font = '700 11px "Chakra Petch", sans-serif';
-    ctx.textAlign = 'center';
-    const labelW = Math.max(122, ctx.measureText(b.name).width + 20);
-    ctx.fillStyle = 'rgba(43, 27, 18, 0.9)';
-    ctx.strokeStyle = b.accent;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(cx - labelW / 2, bottomY + 8, labelW, 21, 5);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#FDF6E3';
-    ctx.fillText(b.name, cx, bottomY + 22);
+    // Clean building label shown only when nearby
+    const dist = Math.hypot(b.tx + b.tw / 2 - this.player.wx, b.ty + b.th / 2 - this.player.wy);
+    if (dist < 4.8) {
+      ctx.font = '700 11px "Chakra Petch", sans-serif';
+      ctx.textAlign = 'center';
+      const labelW = Math.max(118, ctx.measureText(b.name).width + 18);
+      ctx.fillStyle = 'rgba(11, 17, 32, 0.86)';
+      ctx.strokeStyle = b.accent;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(cx - labelW / 2, bottomY + 8, labelW, 20, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillText(b.name, cx, bottomY + 22);
+    }
     ctx.restore();
   }
 
@@ -3605,28 +4443,20 @@ export class SiliconWorldEngine {
 
     if (p.kind === 'tree') {
       const sheet = atlas.trees[p.variant % atlas.trees.length];
-      // Tree1/2 = 1536x256 (8 frames of 192x256), Tree3/4 = 1536x192 (8 frames of 192x192)
       const frames = 8;
       const cellW = sheet.width / frames;
       const cellH = sheet.height;
       const seed = Math.abs(Math.round(p.wx * 7 + p.wy * 11)) + p.variant * 3;
       const frame = Math.floor(this.elapsed * 7 + seed) % frames;
-      this.drawTinyShadow(ctx, atlas, px, py + 6, 88);
+      this.drawTinyShadow(ctx, atlas, px, py + 6, 84);
       ctx.drawImage(sheet, frame * cellW, 0, cellW, cellH, px - 68, py - 118, 136, (cellH / cellW) * 136);
-    } else if (p.kind === 'stump') {
-      const img = atlas.stumps[p.variant % atlas.stumps.length];
-      ctx.drawImage(img, px - 36, py - 68, 72, (img.height / img.width) * 72);
     } else if (p.kind === 'bush') {
       const sheet = atlas.bushes[p.variant % atlas.bushes.length];
       const seed = Math.abs(Math.round(p.wx * 5 + p.wy * 9)) + p.variant * 4;
       this.drawSquareStrip(ctx, sheet, px, py + 12, 68, { fps: 7, seed });
-    } else if (p.kind === 'rock') {
-      const img = atlas.rocks[p.variant % atlas.rocks.length];
-      this.drawTinyShadow(ctx, atlas, px, py + 4, 42);
-      ctx.drawImage(img, px - 26, py - 38, 52, 52);
     } else if (p.kind === 'gold_stone') {
       const img = atlas.goldStones[p.variant % atlas.goldStones.length];
-      this.drawTinyShadow(ctx, atlas, px, py + 4, 52);
+      this.drawTinyShadow(ctx, atlas, px, py + 4, 50);
       ctx.drawImage(img, px - 34, py - 48, 68, 68);
     }
     ctx.restore();
@@ -3683,36 +4513,111 @@ export class SiliconWorldEngine {
     const fps = opts.fps ?? 10;
     const frameIdx = Math.floor(this.elapsed * fps + (opts.seed ?? 0)) % totalFrames;
 
+    const drawW = Math.round(targetHeight);
+    const drawH = Math.round(targetHeight);
+    const dstX = -Math.round(drawW / 2);
+    const dstY = -drawH;
+
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     if (opts.alpha !== undefined && opts.alpha < 1) ctx.globalAlpha = opts.alpha;
-    if (opts.hitFlash) ctx.filter = 'brightness(2.3)';
     ctx.translate(Math.round(px), Math.round(bottomY));
     ctx.scale(opts.flipX ? -1 : 1, 1);
-    ctx.drawImage(
-      strip,
-      frameIdx * fh,
-      0,
-      fh,
-      fh,
-      -Math.round(targetHeight / 2),
-      -Math.round(targetHeight),
-      Math.round(targetHeight),
-      Math.round(targetHeight)
-    );
+
+    if (opts.hitFlash && fh > 0) {
+      // Offscreen silhouette-masked flash so damaged sprites never produce rectangular filter boxes
+      if (!this.flashCanvas) {
+        this.flashCanvas = document.createElement('canvas');
+        this.flashCtx = this.flashCanvas.getContext('2d');
+      }
+      if (this.flashCanvas.width !== fh || this.flashCanvas.height !== fh) {
+        this.flashCanvas.width = fh;
+        this.flashCanvas.height = fh;
+      }
+      const fctx = this.flashCtx;
+      if (fctx) {
+        fctx.clearRect(0, 0, fh, fh);
+        fctx.globalCompositeOperation = 'source-over';
+        fctx.drawImage(strip, frameIdx * fh, 0, fh, fh, 0, 0, fh, fh);
+        fctx.globalCompositeOperation = 'source-atop';
+        fctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+        fctx.fillRect(0, 0, fh, fh);
+        ctx.drawImage(this.flashCanvas, 0, 0, fh, fh, dstX, dstY, drawW, drawH);
+        ctx.restore();
+        return;
+      }
+    }
+
+    ctx.drawImage(strip, frameIdx * fh, 0, fh, fh, dstX, dstY, drawW, drawH);
+    ctx.restore();
+  }
+
+  private drawSpectralStrip(
+    ctx: CanvasRenderingContext2D,
+    strip: HTMLImageElement,
+    px: number,
+    bottomY: number,
+    targetHeight: number,
+    opts: { fps?: number; flipX?: boolean; hitFlash?: boolean; alpha?: number; seed?: number } = {}
+  ): void {
+    const fh = strip.height;
+    if (fh <= 0) return;
+    const totalFrames = Math.max(1, Math.round(strip.width / fh));
+    const fps = opts.fps ?? 10;
+    const frameIdx = Math.floor(this.elapsed * fps + (opts.seed ?? 0)) % totalFrames;
+
+    if (!this.spectralCanvas) {
+      this.spectralCanvas = document.createElement('canvas');
+      this.spectralCtx = this.spectralCanvas.getContext('2d');
+    }
+    if (this.spectralCanvas.width !== fh || this.spectralCanvas.height !== fh) {
+      this.spectralCanvas.width = fh;
+      this.spectralCanvas.height = fh;
+    }
+    const sctx = this.spectralCtx;
+    if (!sctx) {
+      this.drawSquareStrip(ctx, strip, px, bottomY, targetHeight, opts);
+      return;
+    }
+    sctx.clearRect(0, 0, fh, fh);
+    sctx.globalCompositeOperation = 'source-over';
+    sctx.drawImage(strip, frameIdx * fh, 0, fh, fh, 0, 0, fh, fh);
+    sctx.globalCompositeOperation = 'source-atop';
+    sctx.fillStyle = opts.hitFlash ? 'rgba(255, 255, 255, 0.85)' : 'rgba(103, 232, 249, 0.56)';
+    sctx.fillRect(0, 0, fh, fh);
+
+    const drawW = Math.round(targetHeight);
+    const drawH = Math.round(targetHeight);
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = opts.alpha ?? 0.88;
+    ctx.translate(Math.round(px), Math.round(bottomY));
+    ctx.scale(opts.flipX ? -1 : 1, 1);
+    ctx.drawImage(this.spectralCanvas, 0, 0, fh, fh, -Math.round(drawW / 2), -drawH, drawW, drawH);
     ctx.restore();
   }
 
   private drawTinyShadow(
     ctx: CanvasRenderingContext2D,
-    atlas: TinySwordsAtlas,
+    _atlas: TinySwordsAtlas,
     px: number,
     py: number,
     width: number
   ): void {
+    // Crisp, grounded contact shadow directly beneath sprite feet
+    const rx = Math.max(7, width * 0.3);
+    const ry = Math.max(3.5, rx * 0.38);
     ctx.save();
-    ctx.globalAlpha = 0.42;
-    ctx.drawImage(atlas.shadow, 0, 0, 192, 192, px - width / 2, py - width * 0.46, width, width);
+    ctx.translate(Math.round(px), Math.round(py));
+    ctx.scale(1, ry / rx);
+    const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, rx);
+    grad.addColorStop(0, 'rgba(9, 17, 30, 0.3)');
+    grad.addColorStop(0.62, 'rgba(9, 17, 30, 0.12)');
+    grad.addColorStop(1, 'rgba(9, 17, 30, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, rx, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 

@@ -90,11 +90,11 @@ export function TitleScreen({ muted, onStart, onToggleMute, onExitArcade }: Titl
         <div className="ts-wood-panel">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
             <div className="ts-ribbon ts-ribbon-Yellow font-display text-xs font-bold">
-              PAWN TO WARRIOR · CORE ULTRA QUEST
+              1:47 AM DEADLINE · BEFORE SUNRISE
             </div>
             <div className="flex items-center gap-2">
-              <img src={TINY_SWORDS_AVATARS[1]} alt="Blue Pawn" referrerPolicy="no-referrer" className="pixelated h-8 w-8" />
-              <img src={TINY_SWORDS_AVATARS[0]} alt="Blue Warrior" referrerPolicy="no-referrer" className="pixelated h-8 w-8" />
+              <img src={TINY_SWORDS_AVATARS[1]} alt="Byte" referrerPolicy="no-referrer" className="pixelated h-8 w-8" />
+              <img src={TINY_SWORDS_AVATARS[0]} alt="Blue Knight" referrerPolicy="no-referrer" className="pixelated h-8 w-8" />
               <img src={INTEL_HARDWARE_URLS.chip} alt="Core Ultra NPU" referrerPolicy="no-referrer" className="pixelated h-8 w-8" />
               <img src={INTEL_HARDWARE_URLS.aiPc} alt="Intel AI PC" referrerPolicy="no-referrer" className="pixelated h-8 w-8" />
             </div>
@@ -104,10 +104,10 @@ export function TitleScreen({ muted, onStart, onToggleMute, onExitArcade }: Titl
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="font-display text-4xl font-bold tracking-tight text-[#2B1B12] md:text-5xl" style={{ textWrap: 'balance' }}>
-                  SILICON QUEST
+                  BEFORE SUNRISE
                 </h1>
                 <div className="mt-1 font-display text-lg font-bold tracking-widest text-[#00559B] md:text-xl">
-                  INTEL CORE ULTRA ISLANDS
+                  SILICON CITY · CORE ULTRA QUEST
                 </div>
               </div>
               <div className="hidden shrink-0 items-center gap-2 rounded border-2 border-[#b89a6d] bg-[#e9d9b8] p-2 sm:flex">
@@ -117,8 +117,9 @@ export function TitleScreen({ muted, onStart, onToggleMute, onExitArcade }: Titl
             </div>
 
             <p className="mt-4 max-w-lg text-sm font-medium leading-relaxed text-[#3E271A] md:text-base" style={{ textWrap: 'balance' }}>
-              A flashy bargain laptop just froze. Start as Byte the Blue Pawn, unlock Intel Core Ultra E-Cores,
-              NPU AI Boost &amp; Arc XeSS across five islands, defeat the Lag Titan, and test real AI PCs in Expo Park.
+              1:47 AM. One final project left, a warm mug of tea beside the desk, and a bargain laptop your family
+              saved months to buy—freezing at 12% battery. Guide Byte across five islands to defeat Burnout and reach
+              morning light inside the Intel Festival Courtyard.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-4">

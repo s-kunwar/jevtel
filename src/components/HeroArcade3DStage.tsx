@@ -2,29 +2,120 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { Play, Rotate3d, Shield } from 'lucide-react';
-import { EDITORIAL_ART_URLS } from '../game/assets';
+import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+import { Play, Rotate3d, Shield, Volume2, VolumeX } from 'lucide-react';
+import { ARCADE_CABINET_ART_URLS, EDITORIAL_ART_URLS } from '../game/assets';
 import { gameAudio } from '../game/audio';
 
 interface HeroArcade3DStageProps {
   launchNonce: number;
   paused: boolean;
+  darkMode?: boolean;
+  globalMuted?: boolean;
+  onToggleGlobalMute?: () => void;
   onLaunchComplete: () => void;
   onRequestLaunch: () => void;
+}
+
+interface YTPlayerInstance {
+  mute: () => void;
+  unMute: () => void;
+  isMuted: () => boolean;
+  playVideo: () => void;
+  pauseVideo: () => void;
+  stopVideo?: () => void;
+  seekTo: (seconds: number, allowSeekAhead?: boolean) => void;
+  loadVideoById: (opts: { videoId: string; startSeconds?: number }) => void;
+  setVolume: (volume: number) => void;
+  destroy: () => void;
+}
+
+interface YTNamespace {
+  Player: new (
+    el: HTMLElement | string,
+    opts: {
+      videoId: string;
+      width?: number | string;
+      height?: number | string;
+      playerVars?: Record<string, string | number>;
+      events?: {
+        onReady?: (e: { target: YTPlayerInstance }) => void;
+        onStateChange?: (e: { data: number; target: YTPlayerInstance }) => void;
+      };
+    }
+  ) => YTPlayerInstance;
+  PlayerState?: {
+    ENDED: number;
+    PLAYING: number;
+    PAUSED: number;
+  };
+}
+
+declare global {
+  interface Window {
+    YT?: YTNamespace;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+const YOUTUBE_PLAYLIST = [
+  { videoId: 'xhFe3ejXybs', startSeconds: 42, gapAfterMs: 5000, nextTitle: 'Intel Core Ultra Showcase' },
+  { videoId: '0YtfqncTfVc', startSeconds: 0, gapAfterMs: 10000, nextTitle: 'Jevtel Quest Feature' },
+] as const;
+
+let ytApiPromise: Promise<YTNamespace | null> | null = null;
+function loadYouTubeIframeApi(): Promise<YTNamespace | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (ytApiPromise) return ytApiPromise;
+
+  ytApiPromise = new Promise((resolve) => {
+    const existingPrev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      existingPrev?.();
+      resolve(window.YT ?? null);
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://www.youtube.com/iframe_api"]'
+    );
+    if (!existingScript) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      tag.async = true;
+      tag.onerror = () => resolve(null);
+      document.head.appendChild(tag);
+    }
+
+    window.setTimeout(() => {
+      if (window.YT?.Player) resolve(window.YT);
+    }, 4500);
+  });
+
+  return ytApiPromise;
 }
 
 // Pre-allocated scratch vectors for zero-GC animation loop
 const _camTargetPos = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
 const _screenWorldPos = new THREE.Vector3();
+const _screenWorldQuat = new THREE.Quaternion();
 const _screenForward = new THREE.Vector3();
+const _diveStartPos = new THREE.Vector3();
+const _diveStartTarget = new THREE.Vector3();
 const _pointerNdc = new THREE.Vector2();
 
-const HOME_CAM_POS = new THREE.Vector3(2.45, 2.55, 4.35);
-const HOME_LOOK_AT = new THREE.Vector3(0, 1.48, 0.05);
+const HOME_CAM_POS = new THREE.Vector3(2.38, 2.48, 4.22);
+const HOME_LOOK_AT = new THREE.Vector3(0, 1.48, 0.06);
 const HOME_FOV = 38;
 const DIVE_FOV = 54;
-const LAUNCH_DURATION_SEC = 1.5;
+// 1.0s snappy ease-out camera dive + 0.5s modal expand = 1.5s combined
+const LAUNCH_DURATION_SEC = 1.0;
+
+const CSS_SCREEN_W = 560;
+const CSS_SCREEN_H = 406;
+const WORLD_SCREEN_W = 1.1;
+const WORLD_SCREEN_H = 0.798;
 
 function detectSoftwareGl(): boolean {
   if (typeof document === 'undefined') return false;
@@ -43,127 +134,388 @@ function detectSoftwareGl(): boolean {
   }
 }
 
-function createParchmentGrainTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#F4EFE6';
-  ctx.fillRect(0, 0, 256, 256);
-
-  // Subtle warm paper speckles & hairline grain
-  for (let i = 0; i < 1600; i++) {
-    const x = (Math.sin(i * 12.9898) * 43758.5453) % 1;
-    const y = (Math.cos(i * 78.233) * 19341.231) % 1;
-    const px = Math.abs(x) * 256;
-    const py = Math.abs(y) * 256;
-    ctx.fillStyle = i % 3 === 0 ? 'rgba(17, 24, 39, 0.045)' : 'rgba(217, 199, 173, 0.25)';
-    ctx.fillRect(px, py, 1.5, 1.5);
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2, 2);
-  return tex;
-}
-
-function createMarqueeTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-
-  // Warm illuminated parchment marquee with Cobalt & Charcoal ink graphics
-  const grad = ctx.createLinearGradient(0, 0, 1024, 0);
-  grad.addColorStop(0, '#005291');
-  grad.addColorStop(0.5, '#0068B5');
-  grad.addColorStop(1, '#005291');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1024, 256);
-
-  // Inner parchment plaque
-  ctx.fillStyle = '#FAF8F5';
-  ctx.fillRect(28, 24, 968, 208);
-  ctx.strokeStyle = '#111827';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(28, 24, 968, 208);
-
-  // Accent corner stripes
-  ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(48, 42, 18, 172);
-  ctx.fillRect(958, 42, 18, 172);
-
-  // Title typography
-  ctx.fillStyle = '#111827';
-  ctx.textAlign = 'center';
-  ctx.font = '900 92px "Bricolage Grotesque", system-ui, sans-serif';
-  ctx.fillText('JEVTEL', 512, 128);
-
-  ctx.fillStyle = '#0068B5';
-  ctx.font = '800 34px "JetBrains Mono", monospace';
-  ctx.fillText('BYTE VS. THE LAG TITAN · INSERT QUEST', 512, 186);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function createApronTexture(): THREE.CanvasTexture {
+function createBrushedAluminumTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#EFE9DD';
+  const base = ctx.createLinearGradient(0, 0, 512, 512);
+  base.addColorStop(0, '#E3E9F0');
+  base.addColorStop(0.5, '#CFD8E3');
+  base.addColorStop(1, '#DCE4EE');
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, 512, 512);
 
-  // Blueprint grid
-  ctx.strokeStyle = 'rgba(17, 24, 39, 0.08)';
-  ctx.lineWidth = 2;
-  for (let i = 0; i <= 512; i += 32) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, 512);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, i);
-    ctx.lineTo(512, i);
-    ctx.stroke();
+  // Fine directional anodized aluminum grain
+  for (let y = 0; y < 512; y += 2) {
+    const n = Math.abs(Math.sin(y * 17.31) * 43758.54) % 1;
+    ctx.fillStyle = n > 0.5 ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.045)';
+    ctx.fillRect(0, y, 512, 1);
   }
 
-  // Coin-door style embossed frame
-  ctx.fillStyle = '#141824';
-  ctx.fillRect(106, 92, 300, 310);
-  ctx.strokeStyle = '#111827';
-  ctx.lineWidth = 8;
-  ctx.strokeRect(106, 92, 300, 310);
-
-  // Left & Right glowing amber coin slots
-  ctx.fillStyle = '#1F2937';
-  ctx.fillRect(138, 146, 94, 152);
-  ctx.fillRect(280, 146, 94, 152);
-
-  ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(156, 174, 58, 36);
-  ctx.fillRect(298, 174, 58, 36);
-
-  ctx.fillStyle = '#111827';
-  ctx.font = 'bold 18px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('PLAY', 185, 198);
-  ctx.fillText('FREE', 327, 198);
-
-  // Intel Core Ultra badge at bottom
-  ctx.fillStyle = '#0068B5';
-  ctx.fillRect(148, 336, 216, 40);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 20px sans-serif';
-  ctx.fillText('CORE ULTRA INSIDE', 256, 363);
+  // Subtle architectural panel seam & recessed fasteners
+  ctx.strokeStyle = 'rgba(15, 23, 42, 0.14)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(14, 14, 484, 484);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function createSideDecalTexture(side: 'left' | 'right'): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d')!;
+
+  // Brushed slate-cobalt recessed side plate
+  const bg = ctx.createLinearGradient(0, 0, 512, 1024);
+  bg.addColorStop(0, '#0F1A2E');
+  bg.addColorStop(0.45, '#0B1324');
+  bg.addColorStop(1, '#09101E');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 512, 1024);
+
+  // Anodized cobalt perimeter pinstripe
+  ctx.strokeStyle = '#0068B5';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(18, 18, 476, 988);
+
+  ctx.strokeStyle = 'rgba(0, 199, 253, 0.35)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(32, 32, 448, 960);
+
+  // Diagonal Intel Silicon Forge diagonal cobalt chevron stripe
+  ctx.save();
+  ctx.fillStyle = '#0068B5';
+  ctx.beginPath();
+  if (side === 'left') {
+    ctx.moveTo(32, 170);
+    ctx.lineTo(480, 320);
+    ctx.lineTo(480, 440);
+    ctx.lineTo(32, 290);
+  } else {
+    ctx.moveTo(32, 320);
+    ctx.lineTo(480, 170);
+    ctx.lineTo(480, 290);
+    ctx.lineTo(32, 440);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Electric cyan thin highlight line
+  ctx.fillStyle = '#00C7FD';
+  ctx.beginPath();
+  if (side === 'left') {
+    ctx.moveTo(32, 295);
+    ctx.lineTo(480, 445);
+    ctx.lineTo(480, 456);
+    ctx.lineTo(32, 306);
+  } else {
+    ctx.moveTo(32, 445);
+    ctx.lineTo(480, 295);
+    ctx.lineTo(480, 306);
+    ctx.lineTo(32, 456);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Custom Core Ultra 3D tile emblem (CPU / GPU / NPU chiplet diagram)
+  const cx = 256;
+  const cy = 615;
+  ctx.strokeStyle = 'rgba(0, 199, 253, 0.42)';
+  ctx.lineWidth = 3;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx + i * 26, cy - 118);
+    ctx.lineTo(cx + i * 26, cy + 118);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 118, cy + i * 26);
+    ctx.lineTo(cx + 118, cy + i * 26);
+    ctx.stroke();
+  }
+
+  // Die package border
+  ctx.fillStyle = '#111D33';
+  ctx.fillRect(cx - 88, cy - 88, 176, 176);
+  ctx.strokeStyle = '#94A3B8';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(cx - 88, cy - 88, 176, 176);
+
+  // Tile subdivisions inside die
+  ctx.fillStyle = '#0068B5';
+  ctx.fillRect(cx - 72, cy - 72, 68, 68); // Compute Tile
+  ctx.fillStyle = '#00A3E0';
+  ctx.fillRect(cx + 4, cy - 72, 68, 68); // Arc Graphics Tile
+  ctx.fillStyle = '#0284C7';
+  ctx.fillRect(cx - 72, cy + 4, 144, 68); // AI Boost NPU Tile
+
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = '700 18px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('CPU', cx - 38, cy - 32);
+  ctx.fillText('ARC', cx + 38, cy - 32);
+  ctx.fillText('INTEL AI BOOST NPU', cx, cy + 44);
+
+  // Architectural typography header & footer
+  ctx.fillStyle = '#00C7FD';
+  ctx.font = '700 24px "JetBrains Mono", monospace';
+  ctx.fillText('INTEL · SILICON FORGE', 256, 98);
+
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = '800 54px "Bricolage Grotesque", system-ui, sans-serif';
+  ctx.fillText('CORE ULTRA', 256, 152);
+
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '700 22px "Chakra Petch", sans-serif';
+  ctx.fillText('JEVTEL CUSTOM EDITION', 256, 868);
+
+  // Lower heat-sink louver lines
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = i % 2 === 0 ? '#1E293B' : '#0068B5';
+    ctx.fillRect(96, 902 + i * 16, 320, 7);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createCoreUltraMarqueeTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const paintMarquee = (bannerImg?: HTMLImageElement) => {
+    const grad = ctx.createLinearGradient(0, 0, 1024, 256);
+    grad.addColorStop(0, '#041A36');
+    grad.addColorStop(0.5, '#00559B');
+    grad.addColorStop(1, '#041A36');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 256);
+
+    if (bannerImg && bannerImg.naturalWidth > 0) {
+      ctx.save();
+      const iw = bannerImg.naturalWidth;
+      const ih = bannerImg.naturalHeight;
+      const scale = Math.max(1000 / iw, 232 / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      ctx.drawImage(bannerImg, (1024 - dw) / 2, (256 - dh) / 2, dw, dh);
+      // Contrast scrim in center for readable Tiny Swords · Jevtel Quest title lockup
+      const scrim = ctx.createRadialGradient(512, 128, 40, 512, 128, 440);
+      scrim.addColorStop(0, 'rgba(6, 15, 34, 0.78)');
+      scrim.addColorStop(0.7, 'rgba(6, 15, 34, 0.32)');
+      scrim.addColorStop(1, 'rgba(6, 15, 34, 0.08)');
+      ctx.fillStyle = scrim;
+      ctx.fillRect(14, 14, 996, 228);
+      ctx.restore();
+    }
+
+    // Machined aluminum outer bezel frame
+    ctx.strokeStyle = '#DCE3EC';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(14, 14, 996, 228);
+
+    // Cyan luminous edge rails
+    ctx.fillStyle = '#00C7FD';
+    ctx.fillRect(28, 26, 968, 5);
+    ctx.fillRect(28, 225, 968, 5);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#7DD3FC';
+    ctx.font = '700 22px "JetBrains Mono", monospace';
+    ctx.fillText('TINY SWORDS · INTEL CORE ULTRA EDITION', 512, 74);
+
+    // Crisp drop shadow + white lockup
+    ctx.font = '900 74px "Bricolage Grotesque", system-ui, sans-serif';
+    ctx.fillStyle = '#040B1A';
+    ctx.fillText('JEVTEL QUEST', 515, 155);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('JEVTEL QUEST', 512, 152);
+
+    ctx.fillStyle = '#FDE68A';
+    ctx.font = '700 22px "Chakra Petch", sans-serif';
+    ctx.fillText('PLAY BYTE’S ADVENTURE  ·  FREE PLAY', 512, 198);
+
+    tex.needsUpdate = true;
+  };
+
+  paintMarquee();
+  const img = new Image();
+  img.onload = () => paintMarquee(img);
+  img.src = ARCADE_CABINET_ART_URLS.marqueeTinySwords;
+
+  return tex;
+}
+
+function createControlDeckTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#121B2E';
+  ctx.fillRect(0, 0, 1024, 512);
+
+  // Brushed aluminum perimeter trim line
+  ctx.strokeStyle = '#0068B5';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(20, 20, 984, 472);
+
+  ctx.strokeStyle = 'rgba(0, 199, 253, 0.35)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(38, 38, 948, 436);
+
+  // Subtle circuit vector line linking stick to action buttons
+  ctx.strokeStyle = 'rgba(0, 199, 253, 0.25)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(270, 290);
+  ctx.lineTo(490, 290);
+  ctx.lineTo(540, 255);
+  ctx.lineTo(860, 255);
+  ctx.stroke();
+
+  // Silkscreen control legends aligned below joystick & 3 cobalt buttons
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '700 22px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('MOVE', 260, 412);
+
+  ctx.fillStyle = '#7DD3FC';
+  ctx.fillText('ATK', 615, 388);
+  ctx.fillText('NPU', 730, 336);
+  ctx.fillText('DASH', 840, 396);
+
+  ctx.fillStyle = '#E2E8F0';
+  ctx.font = '700 20px "Chakra Petch", sans-serif';
+  ctx.fillText('TINY SWORDS · SILICON FORGE DECK', 512, 86);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createCoinDoorTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 768;
+  canvas.height = 576;
+  const ctx = canvas.getContext('2d')!;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const paintFrontPanel = (artImg?: HTMLImageElement) => {
+    const bg = ctx.createLinearGradient(0, 0, 768, 576);
+    bg.addColorStop(0, '#0F1A2E');
+    bg.addColorStop(1, '#09101E');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 768, 576);
+
+    // Outer cobalt & steel arcade kickplate bezel
+    ctx.strokeStyle = '#94A3B8';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(10, 10, 748, 556);
+
+    // Hand-drawn Tiny Swords game artwork filling upper 82% of cabinet front
+    const artX = 24;
+    const artY = 22;
+    const artW = 720;
+    const artH = 446;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(artX, artY, artW, artH, 8);
+    ctx.clip();
+
+    if (artImg && artImg.naturalWidth > 0) {
+      const iw = artImg.naturalWidth;
+      const ih = artImg.naturalHeight;
+      const scale = Math.max(artW / iw, artH / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      ctx.drawImage(artImg, artX + (artW - dw) / 2, artY + (artH - dh) / 2, dw, dh);
+    } else {
+      ctx.fillStyle = '#0F3A68';
+      ctx.fillRect(artX, artY, artW, artH);
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = '#00C7FD';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(artX, artY, artW, artH, 8);
+    ctx.stroke();
+
+    // Compact lower arcade coin-insert / Free Play metal apron bar
+    ctx.fillStyle = '#0D1424';
+    ctx.fillRect(24, 480, 720, 76);
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(24, 480, 720, 76);
+
+    // Twin backlit coin-door slots flanking the "TINY SWORDS · FREE PLAY" plate
+    const drawMiniSlot = (sx: number, label: string) => {
+      ctx.fillStyle = '#0068B5';
+      ctx.fillRect(sx, 495, 92, 46);
+      ctx.strokeStyle = '#00C7FD';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx, 495, 92, 46);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.font = '700 16px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, sx + 46, 524);
+    };
+
+    drawMiniSlot(48, 'FREE');
+    drawMiniSlot(628, 'PLAY');
+
+    // Center badge plate
+    ctx.fillStyle = '#162238';
+    ctx.fillRect(166, 493, 436, 50);
+    ctx.strokeStyle = '#94A3B8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(166, 493, 436, 50);
+    ctx.fillStyle = '#FDE68A';
+    ctx.font = '800 20px "Bricolage Grotesque", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('TINY SWORDS · SILICON QUEST', 384, 517);
+    ctx.fillStyle = '#7DD3FC';
+    ctx.font = '700 13px "JetBrains Mono", monospace';
+    ctx.fillText('CLICK SCREEN OR BUTTON TO PLAY', 384, 536);
+
+    // Corner rivets
+    ctx.fillStyle = '#CBD5E1';
+    for (const [bx, by] of [
+      [20, 20],
+      [748, 20],
+      [20, 556],
+      [748, 556],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(bx, by, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    tex.needsUpdate = true;
+  };
+
+  paintFrontPanel();
+  const img = new Image();
+  img.onload = () => paintFrontPanel(img);
+  img.src = ARCADE_CABINET_ART_URLS.frontTinySwords;
+
   return tex;
 }
 
@@ -173,184 +525,87 @@ function createContactShadowTexture(): THREE.CanvasTexture {
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
   const grad = ctx.createRadialGradient(128, 128, 18, 128, 128, 124);
-  grad.addColorStop(0, 'rgba(17, 24, 39, 0.36)');
-  grad.addColorStop(0.55, 'rgba(17, 24, 39, 0.14)');
-  grad.addColorStop(1, 'rgba(17, 24, 39, 0)');
+  grad.addColorStop(0, 'rgba(11, 17, 32, 0.42)');
+  grad.addColorStop(0.55, 'rgba(11, 17, 32, 0.16)');
+  grad.addColorStop(1, 'rgba(11, 17, 32, 0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 256, 256);
-  const tex = new THREE.CanvasTexture(canvas);
-  return tex;
+  return new THREE.CanvasTexture(canvas);
 }
 
-function drawCrtScreenFrame(
+function drawCrtIdleOrLaunchFrame(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  time: number,
-  launchProgress: number,
-  hovered: boolean
+  launchProgress: number
 ): void {
-  // Deep CRT night sky background
-  const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, '#07101F');
-  sky.addColorStop(0.65, '#0F2544');
-  sky.addColorStop(1, '#1A345B');
-  ctx.fillStyle = sky;
+  // Deep CRT glass backdrop when video is paused during launch or transitioning
+  ctx.fillStyle = '#050B16';
   ctx.fillRect(0, 0, w, h);
 
-  // Subtle retro grid horizon
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.16)';
-  ctx.lineWidth = 2;
-  const horizonY = h * 0.72;
-  ctx.fillStyle = '#0B172A';
-  ctx.fillRect(0, horizonY, w, h - horizonY);
-  for (let i = -4; i <= 12; i++) {
-    const xTop = w * 0.5 + (i - 4) * 44;
-    const xBot = w * 0.5 + (i - 4) * 118;
-    ctx.beginPath();
-    ctx.moveTo(xTop, horizonY);
-    ctx.lineTo(xBot, h);
-    ctx.stroke();
-  }
-  const scrollOff = (time * 36) % 28;
-  for (let y = horizonY + scrollOff; y < h; y += 28) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
-    ctx.stroke();
-  }
-
-  // Animated Pixel Knight Byte (Left)
-  const bob = Math.sin(time * 4.2) * 7;
-  const bx = w * 0.27;
-  const by = horizonY - 62 + bob;
-
-  // Byte glowing Cobalt aura
-  const aura = ctx.createRadialGradient(bx + 18, by + 26, 6, bx + 18, by + 26, 68);
-  aura.addColorStop(0, 'rgba(56, 189, 248, 0.48)');
-  aura.addColorStop(1, 'rgba(56, 189, 248, 0)');
-  ctx.fillStyle = aura;
-  ctx.beginPath();
-  ctx.arc(bx + 18, by + 26, 68, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Byte body & shield (crisp pixel silhouette)
-  ctx.fillStyle = '#0068B5';
-  ctx.fillRect(bx, by + 16, 40, 44);
-  ctx.fillStyle = '#FAF8F5';
-  ctx.fillRect(bx + 6, by, 28, 22);
-  ctx.fillStyle = '#38BDF8';
-  ctx.fillRect(bx + 14, by + 6, 16, 8);
-  // Shield
-  ctx.fillStyle = '#38BDF8';
-  ctx.fillRect(bx + 36, by + 18, 16, 36);
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(bx + 36, by + 18, 16, 36);
-
-  // Lag Titan Boss (Right)
-  const bossBob = Math.cos(time * 3.1) * 9;
-  const tx = w * 0.69;
-  const ty = horizonY - 108 + bossBob;
-  const bossGlow = ctx.createRadialGradient(tx + 34, ty + 46, 10, tx + 34, ty + 46, 92);
-  bossGlow.addColorStop(0, 'rgba(239, 68, 68, 0.42)');
-  bossGlow.addColorStop(1, 'rgba(239, 68, 68, 0)');
-  ctx.fillStyle = bossGlow;
-  ctx.beginPath();
-  ctx.arc(tx + 34, ty + 46, 92, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#1E1B2E';
-  ctx.fillRect(tx, ty + 18, 72, 86);
-  ctx.fillStyle = '#EF4444';
-  ctx.fillRect(tx + 12, ty + 32, 16, 10);
-  ctx.fillRect(tx + 42, ty + 32, 16, 10);
-  // Thermal warning horns
-  ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(tx - 6, ty + 4, 14, 24);
-  ctx.fillRect(tx + 64, ty + 4, 14, 24);
-
-  // Energy arc between Byte & Lag Titan
-  ctx.strokeStyle = '#38BDF8';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(bx + 54, by + 34);
-  ctx.quadraticCurveTo(w * 0.5, horizonY - 76 + Math.sin(time * 9) * 16, tx - 8, ty + 48);
-  ctx.stroke();
-
-  // Top HUD bar inside CRT
-  ctx.fillStyle = 'rgba(11, 21, 36, 0.85)';
-  ctx.fillRect(24, 22, w - 48, 44);
-  ctx.strokeStyle = '#38BDF8';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(24, 22, w - 48, 44);
-
-  ctx.fillStyle = '#FAF8F5';
-  ctx.font = 'bold 20px "JetBrains Mono", monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('BYTE  HP 100%', 40, 50);
-  ctx.fillStyle = '#F59E0B';
-  ctx.textAlign = 'right';
-  ctx.fillText('LAG TITAN', w - 40, 50);
-
-  // Center CTA banner on screen
-  const blink = hovered || Math.sin(time * 4.5) > -0.25;
-  if (blink) {
-    ctx.fillStyle = hovered ? '#0068B5' : 'rgba(0, 104, 181, 0.92)';
-    ctx.fillRect(w * 0.5 - 165, h * 0.25, 330, 56);
-    ctx.strokeStyle = '#FAF8F5';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(w * 0.5 - 165, h * 0.25, 330, 56);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 24px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('PRESS TO LAUNCH', w * 0.5, h * 0.25 + 36);
-  }
-
-  // Authentic CRT scanlines
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-  for (let y = 0; y < h; y += 4) {
-    ctx.fillRect(0, y, w, 1.5);
-  }
-
-  // Beat 2 CRT Power-On Degauss Flicker & Phosphor Line Burst during launch (1.5s pacing)
   if (launchProgress > 0) {
-    if (launchProgress < 0.36) {
-      // Classic horizontal CRT collapse/expand warm-up flash
-      const bandT = launchProgress / 0.36;
-      const bandH = Math.max(10, h * Math.pow(bandT, 1.35));
+    if (launchProgress < 0.34) {
+      // Classic horizontal CRT degauss line expansion
+      const bandT = launchProgress / 0.34;
+      const bandH = Math.max(8, h * Math.pow(bandT, 1.3));
       ctx.fillStyle = '#020617';
-      ctx.fillRect(0, 0, w, (h - bandH) * 0.5);
-      ctx.fillRect(0, (h + bandH) * 0.5, w, (h - bandH) * 0.5);
-      ctx.fillStyle = `rgba(224, 242, 254, ${Math.max(0.25, 0.9 - bandT * 0.55)})`;
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = `rgba(0, 199, 253, ${0.95 - bandT * 0.45})`;
       ctx.fillRect(0, (h - bandH) * 0.5, w, bandH);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, h * 0.5 - 3, w, 6);
     } else {
-      // Gentle phosphor bloom ramping smoothly as camera dives into screen
-      const flashAlpha = Math.min(0.92, Math.max(0, (launchProgress - 0.52) * 1.65));
-      ctx.fillStyle = `rgba(250, 248, 245, ${flashAlpha})`;
+      // Bright Core Ultra cyan-to-white phosphor flash as camera enters the tube
+      const t = (launchProgress - 0.34) / 0.66;
+      const flashAlpha = Math.min(0.96, t * 1.15);
+      const grad = ctx.createRadialGradient(w * 0.5, h * 0.5, 20, w * 0.5, h * 0.5, w * 0.72);
+      grad.addColorStop(0, `rgba(255, 255, 255, ${flashAlpha})`);
+      grad.addColorStop(0.55, `rgba(56, 189, 248, ${flashAlpha * 0.9})`);
+      grad.addColorStop(1, `rgba(0, 104, 181, ${flashAlpha * 0.85})`);
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
     }
+  } else {
+    // Subtle dark phosphor grid behind YouTube iframe
+    ctx.strokeStyle = 'rgba(0, 199, 253, 0.14)';
+    ctx.lineWidth = 1.5;
+    for (let y = 0; y < h; y += 24) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#7DD3FC';
+    ctx.font = '700 20px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('LOADING CRT FEED...', w * 0.5, h * 0.5);
   }
 }
 
 export function HeroArcade3DStage({
   launchNonce,
   paused,
+  darkMode = false,
+  globalMuted = false,
+  onToggleGlobalMute,
   onLaunchComplete,
   onRequestLaunch,
 }: HeroArcade3DStageProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [webglFailed, setWebglFailed] = useState(false);
   const [hoveredPart, setHoveredPart] = useState(false);
+  const [videoMuted, setVideoMuted] = useState(true);
+  const [videoReady, setVideoReady] = useState(false);
   const [prefersReducedMotion] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   });
 
-  // Refs synced to latest props so Three.js mounts once cleanly
+  // Refs synced to latest props so Three.js & YouTube mount cleanly once
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const globalMutedRef = useRef(globalMuted);
+  globalMutedRef.current = globalMuted;
   const onLaunchCompleteRef = useRef(onLaunchComplete);
   onLaunchCompleteRef.current = onLaunchComplete;
   const onRequestLaunchRef = useRef(onRequestLaunch);
@@ -358,10 +613,144 @@ export function HeroArcade3DStage({
 
   const triggerLaunchRef = useRef<(() => void) | null>(null);
   const lastHandledNonceRef = useRef(launchNonce);
+  const ytPlayerRef = useRef<YTPlayerInstance | null>(null);
+  const playlistIdxRef = useRef<number>(0);
+  const playlistGapTimerRef = useRef<number | null>(null);
+  const playlistCountdownRef = useRef<number | null>(null);
+  const userDesiredMutedRef = useRef(true);
+  const hasUnlockedAudioRef = useRef(false);
+  const isLaunchingRef = useRef(false);
+
+  const clearPlaylistTimers = () => {
+    if (playlistGapTimerRef.current !== null) {
+      window.clearTimeout(playlistGapTimerRef.current);
+      playlistGapTimerRef.current = null;
+    }
+    if (playlistCountdownRef.current !== null) {
+      window.clearInterval(playlistCountdownRef.current);
+      playlistCountdownRef.current = null;
+    }
+  };
+
+  const cutVideoForLaunch = () => {
+    isLaunchingRef.current = true;
+    clearPlaylistTimers();
+    const p = ytPlayerRef.current;
+    if (p) {
+      try {
+        p.mute();
+        p.pauseVideo();
+      } catch {
+        // Ignore player state races
+      }
+    }
+  };
+
+  const handleToggleVideoAudio = () => {
+    hasUnlockedAudioRef.current = true;
+    if (onToggleGlobalMute) {
+      onToggleGlobalMute();
+      return;
+    }
+    const p = ytPlayerRef.current;
+    const nextMuted = !userDesiredMutedRef.current;
+    userDesiredMutedRef.current = nextMuted;
+    setVideoMuted(nextMuted);
+    if (p) {
+      try {
+        if (nextMuted) {
+          p.mute();
+        } else {
+          p.unMute();
+          p.setVolume(85);
+          p.playVideo();
+        }
+      } catch {
+        // Ignore player readiness race
+      }
+    }
+  };
+
+  // Sync top navbar globalMuted with YouTube CRT player immediately
+  useEffect(() => {
+    const effectiveMuted = globalMuted || (!hasUnlockedAudioRef.current && videoMuted);
+    userDesiredMutedRef.current = effectiveMuted;
+    if (globalMuted) {
+      setVideoMuted(true);
+    } else if (hasUnlockedAudioRef.current) {
+      setVideoMuted(false);
+    }
+    const p = ytPlayerRef.current;
+    if (!p || isLaunchingRef.current || pausedRef.current) return;
+    try {
+      if (effectiveMuted) {
+        p.mute();
+      } else {
+        p.unMute();
+        p.setVolume(85);
+        p.playVideo();
+      }
+    } catch {
+      // Ignore player state races
+    }
+  }, [globalMuted, videoMuted]);
+
+  // Global first-click-anywhere listener to unlock YouTube CRT sound automatically (respecting globalMuted)
+  useEffect(() => {
+    if (prefersReducedMotion || webglFailed) return;
+
+    const unlockAudioNow = () => {
+      if (
+        hasUnlockedAudioRef.current ||
+        isLaunchingRef.current ||
+        pausedRef.current ||
+        globalMutedRef.current
+      ) {
+        return;
+      }
+      hasUnlockedAudioRef.current = true;
+      userDesiredMutedRef.current = false;
+      setVideoMuted(false);
+      const p = ytPlayerRef.current;
+      if (p) {
+        try {
+          p.unMute();
+          p.setVolume(85);
+          p.playVideo();
+        } catch {
+          // Ignore if player isn't ready yet; onReady syncs userDesiredMutedRef
+        }
+      }
+    };
+
+    const unlockOnFirstGesture = (ev: Event) => {
+      if (
+        hasUnlockedAudioRef.current ||
+        isLaunchingRef.current ||
+        pausedRef.current ||
+        globalMutedRef.current
+      ) {
+        return;
+      }
+      const target = ev.target as HTMLElement | null;
+      if (target?.closest('[data-crt-audio-toggle="true"]')) return;
+      if (target?.closest('[data-arcade-launch="true"]')) return;
+      if (mountRef.current && target && mountRef.current.contains(target)) return;
+      unlockAudioNow();
+    };
+
+    window.addEventListener('pointerdown', unlockOnFirstGesture, { capture: true, passive: true });
+    window.addEventListener('keydown', unlockOnFirstGesture, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlockOnFirstGesture, { capture: true });
+      window.removeEventListener('keydown', unlockOnFirstGesture, { capture: true });
+    };
+  }, [prefersReducedMotion, webglFailed]);
 
   useEffect(() => {
     if (launchNonce !== lastHandledNonceRef.current) {
       lastHandledNonceRef.current = launchNonce;
+      cutVideoForLaunch();
       if (prefersReducedMotion || webglFailed) {
         onLaunchCompleteRef.current();
       } else {
@@ -391,19 +780,33 @@ export function HeroArcade3DStage({
     const maxAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy() || 1);
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
+    renderer.toneMappingExposure = 1.08;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Synced CSS3DRenderer sits BEHIND WebGL so 3D joystick, bezel & cabinet walls occlude the video
+    const cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.style.position = 'absolute';
+    cssRenderer.domElement.style.inset = '0';
+    cssRenderer.domElement.style.zIndex = '1';
+    cssRenderer.domElement.style.pointerEvents = 'none';
+    cssRenderer.domElement.style.overflow = 'hidden';
+    container.appendChild(cssRenderer.domElement);
+
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.inset = '0';
+    renderer.domElement.style.zIndex = '2';
     renderer.domElement.style.display = 'block';
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
+    renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#FAF8F5');
+    scene.background = null;
+    const cssScene = new THREE.Scene();
 
-    // Mandatory studio Environment Reflection Map
+    // Studio Environment Reflection Map for brushed aluminum & cobalt clearcoat
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     const roomEnv = new RoomEnvironment();
     const envTarget = pmremGenerator.fromScene(roomEnv, 0.04);
@@ -416,12 +819,13 @@ export function HeroArcade3DStage({
     const camera = new THREE.PerspectiveCamera(HOME_FOV, width / height, 0.1, 40);
     camera.position.copy(HOME_CAM_POS);
     renderer.setSize(width, height, false);
+    cssRenderer.setSize(width, height);
 
-    // OrbitControls — rotatable hero showcase with tight framing
+    // OrbitControls — rotatable hero showcase with clean framing
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(HOME_LOOK_AT);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
+    controls.dampingFactor = 0.07;
     controls.enableZoom = false;
     controls.enablePan = false;
     controls.rotateSpeed = 0.72;
@@ -431,11 +835,11 @@ export function HeroArcade3DStage({
     controls.maxAzimuthAngle = 0.82;
     controls.update();
 
-    // Studio 3-Point Lighting Rig
-    const hemiLight = new THREE.HemisphereLight('#FFFDF9', '#D6CFC2', 1.15);
+    // Studio 3-Point Lighting Rig tuned for brushed aluminum & Intel cobalt
+    const hemiLight = new THREE.HemisphereLight('#FFFFFF', '#CBD5E1', 1.2);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight('#FFF6EA', 2.05);
+    const keyLight = new THREE.DirectionalLight('#FFFBF4', 2.2);
     keyLight.position.set(4.2, 6.4, 4.8);
     if (!isSoftwareGl) {
       keyLight.castShadow = true;
@@ -451,12 +855,12 @@ export function HeroArcade3DStage({
     }
     scene.add(keyLight);
 
-    const cobaltRim = new THREE.DirectionalLight('#60A5FA', 0.9);
+    const cobaltRim = new THREE.DirectionalLight('#38BDF8', 1.15);
     cobaltRim.position.set(-4.2, 3.2, -3.4);
     scene.add(cobaltRim);
 
-    const screenGlowLight = new THREE.PointLight('#38BDF8', 1.1, 3.2, 2);
-    screenGlowLight.position.set(0, 1.72, 0.72);
+    const screenGlowLight = new THREE.PointLight('#00C7FD', 1.2, 3.4, 2);
+    screenGlowLight.position.set(0, 1.72, 0.78);
     scene.add(screenGlowLight);
 
     // Track disposable resources
@@ -478,129 +882,199 @@ export function HeroArcade3DStage({
       return t;
     };
 
-    // Procedural textures
-    const parchmentTex = trackTex(createParchmentGrainTexture());
-    const marqueeTex = trackTex(createMarqueeTexture());
-    const apronTex = trackTex(createApronTexture());
+    // Custom Intel Silicon Forge procedural textures
+    const aluminumTex = trackTex(createBrushedAluminumTexture());
+    const leftDecalTex = trackTex(createSideDecalTexture('left'));
+    const rightDecalTex = trackTex(createSideDecalTexture('right'));
+    const marqueeTex = trackTex(createCoreUltraMarqueeTexture());
+    const deckTex = trackTex(createControlDeckTexture());
+    const coinDoorTex = trackTex(createCoinDoorTexture());
     const shadowTex = trackTex(createContactShadowTexture());
 
-    // Dynamic animated CRT canvas texture
+    // CRT launch-flash CanvasTexture behind / replacing CSS3D video during launch dive
     const crtCanvas = document.createElement('canvas');
     crtCanvas.width = 512;
     crtCanvas.height = 384;
     const crtCtx = crtCanvas.getContext('2d')!;
-    drawCrtScreenFrame(crtCtx, 512, 384, 0, 0, false);
+    drawCrtIdleOrLaunchFrame(crtCtx, 512, 384, 0);
     const crtTex = trackTex(new THREE.CanvasTexture(crtCanvas));
     crtTex.colorSpace = THREE.SRGBColorSpace;
 
-    // Materials
-    const parchmentMat = trackMat(
+    // Materials — Brushed Aluminum & Intel Cobalt palette
+    const brushedAluminumMat = trackMat(
+      isSoftwareGl
+        ? new THREE.MeshStandardMaterial({
+            map: aluminumTex,
+            color: '#DCE4EE',
+            roughness: 0.34,
+            metalness: 0.65,
+          })
+        : new THREE.MeshPhysicalMaterial({
+            map: aluminumTex,
+            color: '#E2E8F0',
+            roughness: 0.28,
+            metalness: 0.78,
+            anisotropy: 0.8,
+            clearcoat: 0.25,
+            clearcoatRoughness: 0.22,
+          })
+    );
+
+    const darkSlateMat = trackMat(
       new THREE.MeshStandardMaterial({
-        map: parchmentTex,
-        color: '#F6F1E7',
-        roughness: 0.78,
-        metalness: 0.04,
+        color: '#0F172A',
+        roughness: 0.44,
+        metalness: 0.32,
       })
     );
-    const darkInkMat = trackMat(
-      new THREE.MeshStandardMaterial({
-        color: '#111827',
-        roughness: 0.52,
-        metalness: 0.12,
-      })
+
+    const cobaltTrimMat = trackMat(
+      isSoftwareGl
+        ? new THREE.MeshStandardMaterial({
+            color: '#0068B5',
+            emissive: '#003B70',
+            emissiveIntensity: 0.25,
+            roughness: 0.28,
+            metalness: 0.25,
+          })
+        : new THREE.MeshPhysicalMaterial({
+            color: '#0068B5',
+            emissive: '#003B70',
+            emissiveIntensity: 0.22,
+            roughness: 0.22,
+            metalness: 0.2,
+            clearcoat: 0.85,
+            clearcoatRoughness: 0.14,
+          })
     );
+
     const bezelMat = trackMat(
       new THREE.MeshStandardMaterial({
-        color: '#181E2B',
-        roughness: 0.42,
-        metalness: 0.18,
+        color: '#111827',
+        roughness: 0.36,
+        metalness: 0.28,
       })
     );
+
     const deckSurfaceMat = trackMat(
       new THREE.MeshStandardMaterial({
-        color: '#E5DEC9',
-        roughness: 0.62,
-        metalness: 0.08,
+        map: deckTex,
+        roughness: 0.42,
+        metalness: 0.28,
       })
     );
+
     const chromeMat = trackMat(
       new THREE.MeshStandardMaterial({
-        color: '#E2E8F0',
-        roughness: 0.22,
-        metalness: 0.88,
+        color: '#F1F5F9',
+        roughness: 0.14,
+        metalness: 0.94,
       })
     );
+
     const cobaltBtnMat = trackMat(
+      isSoftwareGl
+        ? new THREE.MeshStandardMaterial({
+            color: '#0068B5',
+            emissive: '#005291',
+            emissiveIntensity: 0.35,
+            roughness: 0.22,
+            metalness: 0.14,
+          })
+        : new THREE.MeshPhysicalMaterial({
+            color: '#0068B5',
+            emissive: '#004B8D',
+            emissiveIntensity: 0.35,
+            roughness: 0.16,
+            metalness: 0.12,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.08,
+          })
+    );
+
+    const cyanRingMat = trackMat(
       new THREE.MeshStandardMaterial({
-        color: '#0068B5',
-        emissive: '#004A87',
-        emissiveIntensity: 0.25,
-        roughness: 0.26,
-        metalness: 0.12,
+        color: '#00C7FD',
+        emissive: '#00C7FD',
+        emissiveIntensity: 0.55,
+        roughness: 0.24,
       })
     );
-    const amberBtnMat = trackMat(
-      new THREE.MeshStandardMaterial({
-        color: '#F59E0B',
-        emissive: '#B45309',
-        emissiveIntensity: 0.25,
-        roughness: 0.26,
-        metalness: 0.12,
-      })
-    );
-    const emeraldBtnMat = trackMat(
-      new THREE.MeshStandardMaterial({
-        color: '#10B981',
-        emissive: '#047857',
-        emissiveIntensity: 0.2,
-        roughness: 0.28,
-        metalness: 0.1,
-      })
-    );
+
     const crtScreenMat = trackMat(
+      new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        opacity: 0,
+        transparent: true,
+        blending: THREE.NoBlending,
+        depthTest: true,
+        depthWrite: true,
+      })
+    );
+
+    const crtFlashMat = trackMat(
       new THREE.MeshStandardMaterial({
         map: crtTex,
         emissiveMap: crtTex,
         emissive: '#FFFFFF',
-        emissiveIntensity: 0.92,
-        roughness: 0.22,
-        metalness: 0.05,
+        emissiveIntensity: 0.95,
+        roughness: 0.2,
+        metalness: 0.06,
       })
     );
+
     const visorMat = trackMat(
       isSoftwareGl
         ? new THREE.MeshStandardMaterial({
             color: '#E0F2FE',
             transparent: true,
-            opacity: 0.1,
-            roughness: 0.12,
-            metalness: 0.15,
+            opacity: 0.06,
+            roughness: 0.1,
+            metalness: 0.1,
           })
         : new THREE.MeshPhysicalMaterial({
             color: '#F8FAFC',
             transparent: true,
-            opacity: 0.14,
-            roughness: 0.06,
+            opacity: 0.08,
+            roughness: 0.05,
             metalness: 0.05,
             clearcoat: 1.0,
-            clearcoatRoughness: 0.05,
-            reflectivity: 0.9,
+            clearcoatRoughness: 0.04,
+            reflectivity: 0.85,
           })
     );
+
     const marqueeMat = trackMat(
       new THREE.MeshStandardMaterial({
         map: marqueeTex,
         emissiveMap: marqueeTex,
         emissive: '#FFFFFF',
-        emissiveIntensity: 0.45,
-        roughness: 0.35,
+        emissiveIntensity: 0.55,
+        roughness: 0.28,
       })
     );
-    const apronMat = trackMat(
+
+    const coinDoorMat = trackMat(
       new THREE.MeshStandardMaterial({
-        map: apronTex,
-        roughness: 0.72,
-        metalness: 0.08,
+        map: coinDoorTex,
+        roughness: 0.44,
+        metalness: 0.38,
+      })
+    );
+
+    const leftDecalMat = trackMat(
+      new THREE.MeshStandardMaterial({
+        map: leftDecalTex,
+        roughness: 0.36,
+        metalness: 0.22,
+      })
+    );
+
+    const rightDecalMat = trackMat(
+      new THREE.MeshStandardMaterial({
+        map: rightDecalTex,
+        roughness: 0.36,
+        metalness: 0.22,
       })
     );
 
@@ -609,34 +1083,34 @@ export function HeroArcade3DStage({
       new THREE.MeshBasicMaterial({
         map: shadowTex,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.78,
         depthWrite: false,
       })
     );
-    const floorShadow = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(3.4, 3.4)), floorShadowMat);
+    const floorShadow = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(3.45, 3.45)), floorShadowMat);
     floorShadow.rotation.x = -Math.PI / 2;
     floorShadow.position.set(0, 0.002, 0.15);
     scene.add(floorShadow);
 
-    // Assemble Multi-Part Arcade Cabinet Group (grounded at y = 0)
+    // Multi-Part Intel Silicon Forge Arcade Cabinet Group (grounded at y = 0)
     const cabinetGroup = new THREE.Group();
     scene.add(cabinetGroup);
 
     const interactiveMeshes: THREE.Object3D[] = [];
 
-    // 1. Extruded Arcade Side Profile (Left & Right Warm Parchment Walls)
+    // 1. Extruded Arcade Side Profile (Left & Right Brushed Aluminum Flanks)
     const sideShape = new THREE.Shape();
     sideShape.moveTo(-0.72, 0.06);
     sideShape.lineTo(0.62, 0.06);
-    sideShape.lineTo(0.62, 1.08); // Front lower apron
-    sideShape.lineTo(0.84, 1.18); // Protruding front control deck lip
-    sideShape.lineTo(0.84, 1.29); // Deck top edge
-    sideShape.lineTo(0.46, 1.38); // Slant back into monitor recess
-    sideShape.lineTo(0.42, 2.28); // CRT bezel top
-    sideShape.lineTo(0.68, 2.42); // Marquee lower overhang
-    sideShape.lineTo(0.64, 2.74); // Marquee top front
-    sideShape.lineTo(-0.34, 2.78); // Crown top
-    sideShape.lineTo(-0.72, 2.48); // Upper back bevel
+    sideShape.lineTo(0.62, 1.08);
+    sideShape.lineTo(0.84, 1.18);
+    sideShape.lineTo(0.84, 1.29);
+    sideShape.lineTo(0.46, 1.38);
+    sideShape.lineTo(0.42, 2.28);
+    sideShape.lineTo(0.68, 2.42);
+    sideShape.lineTo(0.64, 2.74);
+    sideShape.lineTo(-0.34, 2.78);
+    sideShape.lineTo(-0.72, 2.48);
     sideShape.closePath();
 
     const sideGeo = trackGeo(
@@ -649,90 +1123,189 @@ export function HeroArcade3DStage({
       })
     );
 
-    // Note: ExtrudeGeometry extrudes in +Z, rotate -90 deg on Y so profile lies in Z-Y plane!
-    const leftSide = new THREE.Mesh(sideGeo, parchmentMat);
+    const leftSide = new THREE.Mesh(sideGeo, brushedAluminumMat);
     leftSide.rotation.y = -Math.PI / 2;
     leftSide.position.x = -0.68;
     leftSide.castShadow = true;
     leftSide.receiveShadow = true;
     cabinetGroup.add(leftSide);
 
-    const rightSide = new THREE.Mesh(sideGeo, parchmentMat);
+    const rightSide = new THREE.Mesh(sideGeo, brushedAluminumMat);
     rightSide.rotation.y = -Math.PI / 2;
     rightSide.position.x = 0.77;
     rightSide.castShadow = true;
     rightSide.receiveShadow = true;
     cabinetGroup.add(rightSide);
 
-    // Charcoal ink T-molding outer frame trim strips on front edges
-    const leftTrim = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.032, 2.68, 0.035)), darkInkMat);
+    // Custom Silicon Forge Side-Panel Decal Plates
+    const leftDecalPlane = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(1.1, 2.15)), leftDecalMat);
+    leftDecalPlane.rotation.y = -Math.PI / 2;
+    leftDecalPlane.position.set(-0.79, 1.25, -0.05);
+    cabinetGroup.add(leftDecalPlane);
+
+    const rightDecalPlane = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(1.1, 2.15)), rightDecalMat);
+    rightDecalPlane.rotation.y = Math.PI / 2;
+    rightDecalPlane.position.set(0.79, 1.25, -0.05);
+    cabinetGroup.add(rightDecalPlane);
+
+    // Cobalt T-molding outer frame trim strips on front edges
+    const leftTrim = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.034, 2.66, 0.036)), cobaltTrimMat);
     leftTrim.position.set(-0.725, 1.42, 0.62);
     cabinetGroup.add(leftTrim);
 
-    const rightTrim = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.032, 2.68, 0.035)), darkInkMat);
+    const rightTrim = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.034, 2.66, 0.036)), cobaltTrimMat);
     rightTrim.position.set(0.725, 1.42, 0.62);
     cabinetGroup.add(rightTrim);
 
-    // 2. Plinth Base & Feet
-    const basePlinth = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.42, 0.08, 1.3)), darkInkMat);
+    // 2. Plinth Base & Cobalt Accent Strip
+    const basePlinth = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.44, 0.08, 1.32)), darkSlateMat);
     basePlinth.position.set(0, 0.04, -0.04);
     basePlinth.castShadow = true;
     basePlinth.receiveShadow = true;
     cabinetGroup.add(basePlinth);
 
+    const plinthCobaltLine = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.38, 0.022, 0.02)), cyanRingMat);
+    plinthCobaltLine.position.set(0, 0.05, 0.625);
+    cabinetGroup.add(plinthCobaltLine);
+
     // 3. Main Cabinet Core & Back Housing
-    const backBody = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 2.5, 0.86)), parchmentMat);
+    const backBody = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 2.5, 0.86)), darkSlateMat);
     backBody.position.set(0, 1.32, -0.25);
     backBody.castShadow = true;
     backBody.receiveShadow = true;
     cabinetGroup.add(backBody);
 
-    // Roof cap
-    const roofCap = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.38, 0.09, 1.06)), darkInkMat);
+    const roofCap = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.4, 0.09, 1.08)), brushedAluminumMat);
     roofCap.position.set(0, 2.74, -0.02);
     roofCap.rotation.x = 0.04;
     cabinetGroup.add(roofCap);
 
-    // 4. Lower Coin / Graphic Apron
-    const apronBody = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 1.04, 0.56)), parchmentMat);
+    // 4. Lower Embossed Coin Door Apron
+    const apronBody = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 1.04, 0.56)), darkSlateMat);
     apronBody.position.set(0, 0.59, 0.34);
     apronBody.castShadow = true;
     apronBody.receiveShadow = true;
     cabinetGroup.add(apronBody);
 
-    const apronArtPlane = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(1.24, 0.94)), apronMat);
-    apronArtPlane.position.set(0, 0.59, 0.625);
-    cabinetGroup.add(apronArtPlane);
+    const coinDoorPlane = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(1.26, 0.96)), coinDoorMat);
+    coinDoorPlane.position.set(0, 0.59, 0.625);
+    cabinetGroup.add(coinDoorPlane);
+    interactiveMeshes.push(coinDoorPlane);
 
-    // 5. Recessed CRT Bay, Animated Screen & Curved Clearcoat Glass Visor
+    // 5. Recessed CRT Bay, WebGL Flash Backing & Synced YouTube CSS3D Screen
     const crtBayGroup = new THREE.Group();
-    crtBayGroup.position.set(0, 1.84, 0.32);
-    crtBayGroup.rotation.x = -0.24; // Ergonomic upward CRT tilt
+    crtBayGroup.position.set(0, 1.84, 0.34);
+    crtBayGroup.rotation.x = -0.24;
     cabinetGroup.add(crtBayGroup);
 
-    const bezelFrame = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 0.96, 0.22)), bezelMat);
-    bezelFrame.position.set(0, 0, -0.06);
+    const bezelFrame = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 0.96, 0.16)), bezelMat);
+    bezelFrame.position.set(0, 0, -0.04);
     crtBayGroup.add(bezelFrame);
 
-    // Inner dark recessed lip
-    const crtScreenMesh = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(1.12, 0.82)), crtScreenMat);
-    crtScreenMesh.position.set(0, 0, 0.056);
+    // Cobalt inner bezel accent trim
+    const bezelTrimTop = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.16, 0.016, 0.02)), cobaltTrimMat);
+    bezelTrimTop.position.set(0, 0.422, 0.048);
+    crtBayGroup.add(bezelTrimTop);
+
+    const bezelTrimBot = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.16, 0.016, 0.02)), cobaltTrimMat);
+    bezelTrimBot.position.set(0, -0.422, 0.048);
+    crtBayGroup.add(bezelTrimBot);
+
+    const crtScreenMesh = new THREE.Mesh(
+      trackGeo(new THREE.PlaneGeometry(WORLD_SCREEN_W, WORLD_SCREEN_H)),
+      crtScreenMat
+    );
+    crtScreenMesh.position.set(0, 0, 0.044);
+    crtScreenMesh.renderOrder = 1;
     crtBayGroup.add(crtScreenMesh);
     interactiveMeshes.push(crtScreenMesh);
 
-    const crtVisorMesh = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(1.16, 0.85)), visorMat);
-    crtVisorMesh.position.set(0, 0, 0.072);
+    // Degauss / phosphor flash plane rendered in front of aperture only during 1.0s launch
+    const crtFlashMesh = new THREE.Mesh(
+      trackGeo(new THREE.PlaneGeometry(WORLD_SCREEN_W, WORLD_SCREEN_H)),
+      crtFlashMat
+    );
+    crtFlashMesh.position.set(0, 0, 0.047);
+    crtFlashMesh.renderOrder = 3;
+    crtFlashMesh.visible = false;
+    crtBayGroup.add(crtFlashMesh);
+
+    const crtVisorMesh = new THREE.Mesh(
+      trackGeo(new THREE.PlaneGeometry(1.14, 0.83)),
+      visorMat
+    );
+    crtVisorMesh.position.set(0, 0, 0.062);
+    crtVisorMesh.renderOrder = 2;
     crtBayGroup.add(crtVisorMesh);
     interactiveMeshes.push(crtVisorMesh);
 
-    // Speaker grille under CRT
-    const speakerStrip = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.34, 0.14, 0.14)), darkInkMat);
+    // Create perspective-locked CSS3D element containing the YouTube IFrame player
+    const cssScreenWrapper = document.createElement('div');
+    cssScreenWrapper.style.width = `${CSS_SCREEN_W}px`;
+    cssScreenWrapper.style.height = `${CSS_SCREEN_H}px`;
+    cssScreenWrapper.style.borderRadius = '12px';
+    cssScreenWrapper.style.overflow = 'hidden';
+    cssScreenWrapper.style.backgroundColor = '#040812';
+    cssScreenWrapper.style.position = 'relative';
+    cssScreenWrapper.style.pointerEvents = 'none';
+    cssScreenWrapper.style.boxShadow = 'inset 0 0 28px rgba(0, 0, 0, 0.72)';
+    cssScreenWrapper.style.transition = 'opacity 140ms ease-out';
+
+    const ytMountEl = document.createElement('div');
+    ytMountEl.style.width = '100%';
+    ytMountEl.style.height = '100%';
+    ytMountEl.style.pointerEvents = 'none';
+    cssScreenWrapper.appendChild(ytMountEl);
+
+    // Subtle CRT scanlines + glass vignette overlay inside the CSS3D screen (non-blocking)
+    const crtScanOverlay = document.createElement('div');
+    crtScanOverlay.style.position = 'absolute';
+    crtScanOverlay.style.inset = '0';
+    crtScanOverlay.style.pointerEvents = 'none';
+    crtScanOverlay.style.background =
+      'repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.18) 4px), radial-gradient(circle at 50% 45%, rgba(0,199,253,0.04) 55%, rgba(2,6,23,0.52) 100%)';
+    cssScreenWrapper.appendChild(crtScanOverlay);
+
+    // Clean Tiny Swords CRT Standby overlay shown cleanly during 5s / 10s inter-video gaps
+    const crtStandbyOverlay = document.createElement('div');
+    crtStandbyOverlay.style.position = 'absolute';
+    crtStandbyOverlay.style.inset = '0';
+    crtStandbyOverlay.style.display = 'none';
+    crtStandbyOverlay.style.flexDirection = 'column';
+    crtStandbyOverlay.style.alignItems = 'center';
+    crtStandbyOverlay.style.justifyContent = 'center';
+    crtStandbyOverlay.style.gap = '10px';
+    crtStandbyOverlay.style.padding = '24px';
+    crtStandbyOverlay.style.background =
+      'radial-gradient(circle at 50% 40%, #0E294B 0%, #060D1D 70%, #030712 100%)';
+    crtStandbyOverlay.style.color = '#F8FAFC';
+    crtStandbyOverlay.style.textAlign = 'center';
+    crtStandbyOverlay.style.pointerEvents = 'none';
+    crtStandbyOverlay.innerHTML =
+      '<div style="font:700 12px \'JetBrains Mono\',monospace;letter-spacing:0.18em;color:#38BDF8;text-transform:uppercase;">TINY SWORDS · INTEL CORE ULTRA</div>' +
+      '<div data-standby-title style="font:800 22px \'Bricolage Grotesque\',sans-serif;color:#FFFFFF;">Next Showcase Loading...</div>' +
+      '<div data-standby-timer style="font:700 13px \'JetBrains Mono\',monospace;color:#FDE68A;">Starting in 5s</div>';
+    cssScreenWrapper.appendChild(crtStandbyOverlay);
+
+    const standbyTitleEl = crtStandbyOverlay.querySelector<HTMLElement>('[data-standby-title]');
+    const standbyTimerEl = crtStandbyOverlay.querySelector<HTMLElement>('[data-standby-timer]');
+
+    const cssScreenObject = new CSS3DObject(cssScreenWrapper);
+    cssScreenObject.scale.set(
+      WORLD_SCREEN_W / CSS_SCREEN_W,
+      WORLD_SCREEN_H / CSS_SCREEN_H,
+      1
+    );
+    cssScene.add(cssScreenObject);
+
+    // Speaker grille under marquee with cobalt acoustic backing
+    const speakerStrip = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.34, 0.14, 0.14)), darkSlateMat);
     speakerStrip.position.set(0, 2.34, 0.45);
     speakerStrip.rotation.x = 0.28;
     cabinetGroup.add(speakerStrip);
 
-    // 6. Illuminated Top Marquee Box
-    const marqueeBox = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 0.34, 0.28)), darkInkMat);
+    // 6. Illuminated Custom Intel Core Ultra Top Marquee Box
+    const marqueeBox = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 0.34, 0.28)), darkSlateMat);
     marqueeBox.position.set(0, 2.57, 0.52);
     marqueeBox.rotation.x = 0.14;
     cabinetGroup.add(marqueeBox);
@@ -742,13 +1315,13 @@ export function HeroArcade3DStage({
     marqueeBox.add(marqueeFace);
     interactiveMeshes.push(marqueeFace);
 
-    // 7. Angled Tactile Control Deck, Spring Joystick & Reactive Arcade Buttons
+    // 7. Angled Control Deck, Classic Chrome Joystick & Cobalt Action Buttons
     const deckGroup = new THREE.Group();
     deckGroup.position.set(0, 1.24, 0.56);
     deckGroup.rotation.x = 0.18;
     cabinetGroup.add(deckGroup);
 
-    const deckBase = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.38, 0.14, 0.58)), darkInkMat);
+    const deckBase = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.38, 0.14, 0.58)), brushedAluminumMat);
     deckBase.castShadow = true;
     deckGroup.add(deckBase);
 
@@ -756,48 +1329,67 @@ export function HeroArcade3DStage({
     deckTop.position.set(0, 0.075, 0);
     deckGroup.add(deckTop);
 
-    // Joystick base collar
-    const joyCollar = new THREE.Mesh(
-      trackGeo(new THREE.CylinderGeometry(0.085, 0.095, 0.03, 24)),
-      darkInkMat
+    // Front deck cobalt accent rail
+    const deckFrontRail = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.36, 0.032, 0.024)), cobaltTrimMat);
+    deckFrontRail.position.set(0, 0.03, 0.295);
+    deckGroup.add(deckFrontRail);
+
+    // Joystick dust washer & chrome collar
+    const joyWasher = new THREE.Mesh(
+      trackGeo(new THREE.CylinderGeometry(0.092, 0.098, 0.012, 24)),
+      darkSlateMat
     );
-    joyCollar.position.set(-0.34, 0.095, 0.04);
+    joyWasher.position.set(-0.34, 0.092, 0.03);
+    deckGroup.add(joyWasher);
+
+    const joyCollar = new THREE.Mesh(
+      trackGeo(new THREE.CylinderGeometry(0.042, 0.056, 0.026, 24)),
+      chromeMat
+    );
+    joyCollar.position.set(-0.34, 0.104, 0.03);
     deckGroup.add(joyCollar);
 
-    // Joystick pivot assembly (rotates cleanly on spring physics)
+    // Classic Chrome Stick Pivot + Cobalt Ball Top
     const joystickPivot = new THREE.Group();
-    joystickPivot.position.set(-0.34, 0.1, 0.04);
+    joystickPivot.position.set(-0.34, 0.1, 0.03);
     deckGroup.add(joystickPivot);
 
     const joyShaft = new THREE.Mesh(
-      trackGeo(new THREE.CylinderGeometry(0.018, 0.018, 0.17, 16)),
+      trackGeo(new THREE.CylinderGeometry(0.017, 0.017, 0.185, 16)),
       chromeMat
     );
-    joyShaft.position.y = 0.085;
+    joyShaft.position.y = 0.092;
     joystickPivot.add(joyShaft);
 
-    const joyBall = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.056, 24, 24)), cobaltBtnMat);
-    joyBall.position.y = 0.185;
+    const joyBall = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.058, 24, 24)), cobaltBtnMat);
+    joyBall.position.y = 0.195;
     joyBall.castShadow = true;
     joystickPivot.add(joyBall);
     interactiveMeshes.push(joyBall);
 
-    // Arcade Buttons (Cobalt Attack, Amber Boost, Emerald Dash)
-    const createArcadeButton = (
+    // Classic Cobalt Arcade Action Buttons (ATK, NPU, DASH) with subtle cyan bevel rings
+    const createCobaltButton = (
       x: number,
-      z: number,
-      capMat: THREE.Material
+      z: number
     ): { cap: THREE.Mesh; baseY: number } => {
-      const housing = new THREE.Mesh(
-        trackGeo(new THREE.CylinderGeometry(0.054, 0.058, 0.024, 20)),
-        darkInkMat
+      const bezel = new THREE.Mesh(
+        trackGeo(new THREE.CylinderGeometry(0.056, 0.06, 0.022, 24)),
+        darkSlateMat
       );
-      housing.position.set(x, 0.092, z);
-      deckGroup.add(housing);
+      bezel.position.set(x, 0.092, z);
+      deckGroup.add(bezel);
+
+      const glowRing = new THREE.Mesh(
+        trackGeo(new THREE.TorusGeometry(0.049, 0.0045, 8, 24)),
+        cyanRingMat
+      );
+      glowRing.rotation.x = Math.PI / 2;
+      glowRing.position.set(x, 0.103, z);
+      deckGroup.add(glowRing);
 
       const cap = new THREE.Mesh(
-        trackGeo(new THREE.CylinderGeometry(0.042, 0.046, 0.032, 20)),
-        capMat
+        trackGeo(new THREE.CylinderGeometry(0.043, 0.047, 0.03, 24)),
+        cobaltBtnMat
       );
       const baseY = 0.108;
       cap.position.set(x, baseY, z);
@@ -806,11 +1398,139 @@ export function HeroArcade3DStage({
       return { cap, baseY };
     };
 
-    const btnCobalt = createArcadeButton(0.14, 0.05, cobaltBtnMat);
-    const btnAmber = createArcadeButton(0.29, -0.02, amberBtnMat);
-    const btnEmerald = createArcadeButton(0.43, 0.06, emeraldBtnMat);
+    const btnAtk = createCobaltButton(0.14, 0.04);
+    const btnNpu = createCobaltButton(0.29, -0.025);
+    const btnDash = createCobaltButton(0.43, 0.055);
 
-    // Raycaster & Launch State Machine
+    // Initialize YouTube IFrame Player with 2-video playlist (5s gap after v1, 10s delay after v2)
+    let disposed = false;
+    playlistIdxRef.current = 0;
+
+    const showStandbyGap = (nextTitle: string, delayMs: number, onGapDone: () => void) => {
+      clearPlaylistTimers();
+      let remainingSec = Math.ceil(delayMs / 1000);
+      if (standbyTitleEl) standbyTitleEl.textContent = nextTitle;
+      if (standbyTimerEl) standbyTimerEl.textContent = `Starting in ${remainingSec}s · Click screen to play game`;
+      crtStandbyOverlay.style.display = 'flex';
+
+      playlistCountdownRef.current = window.setInterval(() => {
+        remainingSec = Math.max(1, remainingSec - 1);
+        if (standbyTimerEl) {
+          standbyTimerEl.textContent = `Starting in ${remainingSec}s · Click screen to play game`;
+        }
+      }, 1000);
+
+      playlistGapTimerRef.current = window.setTimeout(() => {
+        clearPlaylistTimers();
+        if (disposed || isLaunchingRef.current || pausedRef.current) return;
+        crtStandbyOverlay.style.display = 'none';
+        onGapDone();
+      }, delayMs);
+    };
+
+    const syncMuteState = (player: YTPlayerInstance) => {
+      if (userDesiredMutedRef.current) {
+        player.mute();
+      } else {
+        player.unMute();
+        player.setVolume(85);
+      }
+    };
+
+    void loadYouTubeIframeApi().then((YT) => {
+      if (disposed || !YT?.Player) return;
+      try {
+        const firstVideo = YOUTUBE_PLAYLIST[0];
+        const player = new YT.Player(ytMountEl, {
+          videoId: firstVideo.videoId,
+          width: CSS_SCREEN_W,
+          height: CSS_SCREEN_H,
+          playerVars: {
+            autoplay: 1,
+            mute: 1,
+            start: firstVideo.startSeconds,
+            controls: 0,
+            modestbranding: 1,
+            rel: 0,
+            playsinline: 1,
+            disablekb: 1,
+            fs: 0,
+            iv_load_policy: 3,
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: (ev) => {
+              if (disposed) {
+                try {
+                  ev.target.destroy();
+                } catch {
+                  // Ignore
+                }
+                return;
+              }
+              ytPlayerRef.current = ev.target;
+              setVideoReady(true);
+              crtStandbyOverlay.style.display = 'none';
+              try {
+                ev.target.seekTo(firstVideo.startSeconds, true);
+                if (!isLaunchingRef.current && !pausedRef.current) {
+                  syncMuteState(ev.target);
+                  ev.target.playVideo();
+                } else {
+                  ev.target.mute();
+                  ev.target.pauseVideo();
+                }
+              } catch {
+                // Ignore
+              }
+            },
+            onStateChange: (ev) => {
+              if (disposed) return;
+              const endedCode = YT.PlayerState?.ENDED ?? 0;
+              const playingCode = YT.PlayerState?.PLAYING ?? 1;
+              if (ev.data === playingCode) {
+                crtStandbyOverlay.style.display = 'none';
+                try {
+                  syncMuteState(ev.target);
+                } catch {
+                  // Ignore
+                }
+              } else if (ev.data === endedCode && !isLaunchingRef.current && !pausedRef.current) {
+                const finishedIdx = playlistIdxRef.current;
+                const finishedEntry = YOUTUBE_PLAYLIST[finishedIdx] ?? YOUTUBE_PLAYLIST[0];
+                const nextIdx = (finishedIdx + 1) % YOUTUBE_PLAYLIST.length;
+                const nextEntry = YOUTUBE_PLAYLIST[nextIdx];
+
+                try {
+                  ev.target.pauseVideo();
+                } catch {
+                  // Ignore
+                }
+
+                showStandbyGap(finishedEntry.nextTitle, finishedEntry.gapAfterMs, () => {
+                  playlistIdxRef.current = nextIdx;
+                  try {
+                    ev.target.loadVideoById({
+                      videoId: nextEntry.videoId,
+                      startSeconds: nextEntry.startSeconds,
+                    });
+                    syncMuteState(ev.target);
+                    ev.target.playVideo();
+                  } catch {
+                    // Ignore
+                  }
+                });
+              }
+            },
+          },
+        });
+        ytPlayerRef.current = player;
+      } catch {
+        // Fallback to CRT texture if YouTube constructor fails
+      }
+    });
+
+    // Raycaster & Snappy 1.0s Launch State Machine
     const raycaster = new THREE.Raycaster();
     let isHovered = false;
     let launchState: 'idle' | 'launching' = 'idle';
@@ -822,32 +1542,42 @@ export function HeroArcade3DStage({
     let joyTiltZ = 0;
     let joyVelX = 0;
     let joyVelZ = 0;
-    let btnPressCobalt = 0;
-    let btnPressAmber = 0;
-    let btnPressEmerald = 0;
+    let btnPressAtk = 0;
+    let btnPressNpu = 0;
+    let btnPressDash = 0;
 
     const startCabinetLaunch = () => {
       if (launchState === 'launching') return;
       launchState = 'launching';
+      isLaunchingRef.current = true;
       launchElapsed = 0;
       controls.enabled = false;
 
-      // Crisp Odama-inspired microswitch click + CRT degauss chime
+      // Immediately cut YouTube video sound & enable WebGL CRT flash overlay for launch dive
+      cutVideoForLaunch();
+      cssScreenWrapper.style.opacity = '0';
+      crtFlashMesh.visible = true;
+
+      // Snapshot camera start pose for snappy ease-out dive
+      _diveStartPos.copy(camera.position);
+      _diveStartTarget.copy(controls.target);
+
+      // Microswitch click + CRT degauss chime
       gameAudio.playArcadeClick();
       gameAudio.playArcadePowerOn();
 
-      // Physical deck snap: joystick pushes diagonally + arcade buttons depress
+      // Physical deck snap: chrome stick leans + cobalt buttons depress
       joyTiltX = 0.28;
       joyTiltZ = -0.34;
       joyVelX = 0;
       joyVelZ = 0;
-      btnPressCobalt = 1;
-      btnPressAmber = 0.85;
-      btnPressEmerald = 0.65;
+      btnPressAtk = 1;
+      btnPressNpu = 0.85;
+      btnPressDash = 0.7;
     };
     triggerLaunchRef.current = startCabinetLaunch;
 
-    // Pointer drag-vs-click guard so OrbitControls drag never triggers launch
+    // Pointer drag-vs-click guard so OrbitControls drag works smoothly across CRT too
     let downX = 0;
     let downY = 0;
     let lastHoverCheck = 0;
@@ -889,13 +1619,40 @@ export function HeroArcade3DStage({
     const onPointerUp = (ev: PointerEvent) => {
       if (launchState === 'launching') return;
       const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY);
-      if (dist > 7) return; // User rotated the 3D cabinet
+      if (dist > 7) {
+        // User spun the 3D cabinet -> unlock CRT sound cleanly on first interaction
+        if (!hasUnlockedAudioRef.current) {
+          hasUnlockedAudioRef.current = true;
+          userDesiredMutedRef.current = false;
+          setVideoMuted(false);
+          try {
+            ytPlayerRef.current?.unMute();
+            ytPlayerRef.current?.setVolume(85);
+            ytPlayerRef.current?.playVideo();
+          } catch {
+            // Ignore
+          }
+        }
+        return;
+      }
 
       updatePointerNdc(ev);
       raycaster.setFromCamera(_pointerNdc, camera);
       const hits = raycaster.intersectObjects(interactiveMeshes, false);
       if (hits.length > 0) {
+        cutVideoForLaunch();
         onRequestLaunchRef.current();
+      } else if (!hasUnlockedAudioRef.current) {
+        hasUnlockedAudioRef.current = true;
+        userDesiredMutedRef.current = false;
+        setVideoMuted(false);
+        try {
+          ytPlayerRef.current?.unMute();
+          ytPlayerRef.current?.setVolume(85);
+          ytPlayerRef.current?.playVideo();
+        } catch {
+          // Ignore
+        }
       }
     };
 
@@ -904,7 +1661,7 @@ export function HeroArcade3DStage({
     renderer.domElement.addEventListener('pointerleave', onPointerLeave);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
 
-    // Visibility & Viewport observers so offscreen/modal state never burns CPU/GPU
+    // Visibility & Viewport observers
     let isInViewport = true;
     let isDocumentVisible = !document.hidden;
     let contextLost = false;
@@ -922,7 +1679,7 @@ export function HeroArcade3DStage({
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
-    // Responsive ResizeObserver
+    // Responsive ResizeObserver updating both WebGL and CSS3D renderers
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
@@ -931,10 +1688,10 @@ export function HeroArcade3DStage({
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
+      cssRenderer.setSize(w, h);
     });
     ro.observe(container);
 
-    // WebGL context loss safety
     const onContextLost = (e: Event) => {
       e.preventDefault();
       contextLost = true;
@@ -953,6 +1710,7 @@ export function HeroArcade3DStage({
 
     const resetFromModalClose = () => {
       launchState = 'idle';
+      isLaunchingRef.current = false;
       launchElapsed = 0;
       camera.position.copy(HOME_CAM_POS);
       camera.fov = HOME_FOV;
@@ -960,8 +1718,30 @@ export function HeroArcade3DStage({
       controls.target.copy(HOME_LOOK_AT);
       controls.enabled = true;
       controls.update();
-      drawCrtScreenFrame(crtCtx, 512, 384, elapsedTotal, 0, isHovered);
+      drawCrtIdleOrLaunchFrame(crtCtx, 512, 384, 0);
       crtTex.needsUpdate = true;
+      crtFlashMesh.visible = false;
+
+      // Restore YouTube CRT playlist from Video 1 at t=42s
+      clearPlaylistTimers();
+      playlistIdxRef.current = 0;
+      crtStandbyOverlay.style.display = 'none';
+      cssScreenWrapper.style.opacity = '1';
+      const p = ytPlayerRef.current;
+      if (p) {
+        try {
+          const firstVideo = YOUTUBE_PLAYLIST[0];
+          p.loadVideoById({ videoId: firstVideo.videoId, startSeconds: firstVideo.startSeconds });
+          if (userDesiredMutedRef.current) p.mute();
+          else {
+            p.unMute();
+            p.setVolume(85);
+          }
+          p.playVideo();
+        } catch {
+          // Ignore
+        }
+      }
     };
 
     const tick = (now: number) => {
@@ -969,7 +1749,6 @@ export function HeroArcade3DStage({
       prevTime = now;
 
       if (prevPaused && !pausedRef.current) {
-        // Modal closed -> cleanly reset cabinet camera back to hero framing
         resetFromModalClose();
       }
       prevPaused = pausedRef.current;
@@ -979,52 +1758,43 @@ export function HeroArcade3DStage({
       if (canRender) {
         elapsedTotal += dt;
 
-        // Subtle idle cabinet float breath when not launching
         if (launchState === 'idle') {
           cabinetGroup.position.y = Math.sin(elapsedTotal * 1.4) * 0.012;
-          // Gentle autonomous joystick fidget micro-tilt on hover
           const targetHoverTilt = isHovered ? Math.sin(elapsedTotal * 8) * 0.08 : 0;
           joyTiltX += (targetHoverTilt - joyTiltX) * Math.min(1, dt * 8);
           joyTiltZ += ((isHovered ? -0.08 : 0) - joyTiltZ) * Math.min(1, dt * 8);
           controls.update();
         } else {
-          // Beat 2 & Beat 3 Launch Choreography
+          // 1.0s Snappy Ease-Out Camera Dive + CRT Flash
           launchElapsed += dt;
           const progress = Math.min(1, launchElapsed / LAUNCH_DURATION_SEC);
+          const diveEase = 1 - Math.pow(1 - progress, 3.2);
 
-          // Spring-back joystick (unhurried tactile motion)
-          const k = 64;
-          const damp = 8.5;
+          // Spring-back joystick
+          const k = 90;
+          const damp = 10.5;
           joyVelX += (-k * joyTiltX - damp * joyVelX) * dt;
           joyVelZ += (-k * joyTiltZ - damp * joyVelZ) * dt;
           joyTiltX += joyVelX * dt;
           joyTiltZ += joyVelZ * dt;
 
           // Button rebound
-          btnPressCobalt = Math.max(0, btnPressCobalt - dt * 1.9);
-          btnPressAmber = Math.max(0, btnPressAmber - dt * 1.7);
-          btnPressEmerald = Math.max(0, btnPressEmerald - dt * 2.1);
+          btnPressAtk = Math.max(0, btnPressAtk - dt * 2.4);
+          btnPressNpu = Math.max(0, btnPressNpu - dt * 2.2);
+          btnPressDash = Math.max(0, btnPressDash - dt * 2.6);
 
-          // Beat 3 Camera Dive into CRT center starting smoothly around t = 0.34 (~0.51s into 1.5s)
-          if (progress > 0.34) {
-            crtScreenMesh.updateWorldMatrix(true, false);
-            crtScreenMesh.getWorldPosition(_screenWorldPos);
-            _screenForward.setFromMatrixColumn(crtScreenMesh.matrixWorld, 2).normalize();
+          crtScreenMesh.updateWorldMatrix(true, false);
+          crtScreenMesh.getWorldPosition(_screenWorldPos);
+          _screenForward.setFromMatrixColumn(crtScreenMesh.matrixWorld, 2).normalize();
+          _camTargetPos.copy(_screenWorldPos).addScaledVector(_screenForward, 0.32);
+          _lookTarget.copy(_screenWorldPos);
 
-            _camTargetPos.copy(_screenWorldPos).addScaledVector(_screenForward, 0.34);
-            _lookTarget.copy(_screenWorldPos);
+          camera.position.lerpVectors(_diveStartPos, _camTargetPos, diveEase);
+          controls.target.lerpVectors(_diveStartTarget, _lookTarget, diveEase);
+          camera.lookAt(controls.target);
 
-            camera.position.x = THREE.MathUtils.damp(camera.position.x, _camTargetPos.x, 3.4, dt);
-            camera.position.y = THREE.MathUtils.damp(camera.position.y, _camTargetPos.y, 3.4, dt);
-            camera.position.z = THREE.MathUtils.damp(camera.position.z, _camTargetPos.z, 3.4, dt);
-            controls.target.x = THREE.MathUtils.damp(controls.target.x, _lookTarget.x, 4.2, dt);
-            controls.target.y = THREE.MathUtils.damp(controls.target.y, _lookTarget.y, 4.2, dt);
-            controls.target.z = THREE.MathUtils.damp(controls.target.z, _lookTarget.z, 4.2, dt);
-            camera.lookAt(controls.target);
-
-            camera.fov = THREE.MathUtils.damp(camera.fov, DIVE_FOV, 3.0, dt);
-            camera.updateProjectionMatrix();
-          }
+          camera.fov = THREE.MathUtils.lerp(HOME_FOV, DIVE_FOV, diveEase);
+          camera.updateProjectionMatrix();
 
           if (progress >= 1) {
             launchState = 'idle';
@@ -1032,25 +1802,36 @@ export function HeroArcade3DStage({
           }
         }
 
-        // Apply joystick & button kinematics
+        // Apply joystick & cobalt button kinematics
         joystickPivot.rotation.z = -joyTiltX;
         joystickPivot.rotation.x = joyTiltZ;
-        btnCobalt.cap.position.y = btnCobalt.baseY - btnPressCobalt * 0.018;
-        btnAmber.cap.position.y = btnAmber.baseY - btnPressAmber * 0.018;
-        btnEmerald.cap.position.y = btnEmerald.baseY - btnPressEmerald * 0.018;
+        btnAtk.cap.position.y = btnAtk.baseY - btnPressAtk * 0.018;
+        btnNpu.cap.position.y = btnNpu.baseY - btnPressNpu * 0.018;
+        btnDash.cap.position.y = btnDash.baseY - btnPressDash * 0.018;
 
-        // Redraw CRT CanvasTexture at ~24fps during idle, every frame during launch flicker
-        const redrawIntervalMs = launchState === 'launching' ? 16 : 42;
+        // Sync CSS3D YouTube screen transform cleanly to CRT world matrix
+        cabinetGroup.updateMatrixWorld(true);
+        crtScreenMesh.getWorldPosition(_screenWorldPos);
+        crtScreenMesh.getWorldQuaternion(_screenWorldQuat);
+        _screenForward.setFromMatrixColumn(crtScreenMesh.matrixWorld, 2).normalize();
+        cssScreenObject.position.copy(_screenWorldPos).addScaledVector(_screenForward, 0.002);
+        cssScreenObject.quaternion.copy(_screenWorldQuat);
+
+        // Redraw CRT flash canvas during launch
+        const redrawIntervalMs = launchState === 'launching' ? 16 : 250;
         if (now - lastCrtRedraw >= redrawIntervalMs) {
           lastCrtRedraw = now;
           const lp =
             launchState === 'launching' ? Math.min(1, launchElapsed / LAUNCH_DURATION_SEC) : 0;
-          drawCrtScreenFrame(crtCtx, 512, 384, elapsedTotal, lp, isHovered);
-          crtTex.needsUpdate = true;
-          screenGlowLight.intensity = lp > 0 ? 1.8 + lp * 1.4 : isHovered ? 1.45 : 1.05;
+          if (lp > 0) {
+            drawCrtIdleOrLaunchFrame(crtCtx, 512, 384, lp);
+            crtTex.needsUpdate = true;
+          }
+          screenGlowLight.intensity = lp > 0 ? 1.85 + lp * 1.6 : isHovered ? 1.45 : 1.15;
         }
 
         renderer.render(scene, camera);
+        cssRenderer.render(cssScene, camera);
       }
 
       if (isSoftwareGl) {
@@ -1065,6 +1846,8 @@ export function HeroArcade3DStage({
     rafId = window.requestAnimationFrame(tick);
 
     return () => {
+      disposed = true;
+      clearPlaylistTimers();
       window.cancelAnimationFrame(rafId);
       window.clearTimeout(softwareTimerId);
       io.disconnect();
@@ -1076,6 +1859,16 @@ export function HeroArcade3DStage({
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
+
+      if (ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.destroy();
+        } catch {
+          // Ignore
+        }
+        ytPlayerRef.current = null;
+      }
+
       controls.dispose();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
@@ -1085,60 +1878,97 @@ export function HeroArcade3DStage({
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
       }
+      if (cssRenderer.domElement.parentNode === container) {
+        container.removeChild(cssRenderer.domElement);
+      }
     };
   }, [prefersReducedMotion]);
 
   if (prefersReducedMotion || webglFailed) {
     return (
-      <button
-        type="button"
-        onClick={onRequestLaunch}
-        aria-label="Get Over Here, Byte needs you! Click to play"
-        className="group relative flex h-full min-h-[420px] w-full flex-col justify-between overflow-hidden rounded-2xl border-2 border-[#111827] bg-[#FAF8F5] text-left shadow-[6px_6px_0px_#111827] transition-shadow duration-200 hover:shadow-[10px_10px_0px_#111827]"
-      >
-        <img
-          src={EDITORIAL_ART_URLS.heroGateway}
-          alt="Pen-and-ink illustration of knight Byte with a glowing blue shield confronting the dark Lag Titan."
-          referrerPolicy="no-referrer"
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-4 border-t-2 border-[#111827] bg-[#FAF8F5] px-5 py-4">
+      <div className="relative flex h-full min-h-[420px] w-full flex-col justify-between overflow-hidden rounded-2xl border-2 border-[#111827] bg-[#0B1220] text-left shadow-[6px_6px_0px_#111827] dark:border-[#334155] dark:shadow-[6px_6px_0px_#020617]">
+        <div className="relative flex-1 overflow-hidden bg-[#040812]">
+          <img
+            src={EDITORIAL_ART_URLS.heroGateway}
+            alt="Byte confronting the Lag Titan inside the Intel Core Ultra showcase."
+            referrerPolicy="no-referrer"
+            className="h-full w-full object-cover opacity-90"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4 border-t-2 border-[#111827] bg-[#FAF8F5] px-5 py-4 dark:border-[#334155] dark:bg-[#111827]">
           <div>
-            <div className="font-editorial text-xl font-bold text-[#111827]">
+            <div className="font-editorial text-xl font-bold text-[#111827] dark:text-[#F8FAFC]">
               Byte vs. The Lag Titan
             </div>
-            <div className="text-xs font-medium text-[#4B5563]">
+            <div className="text-xs font-medium text-[#4B5563] dark:text-[#94A3B8]">
               Play the story and rescue Silicon City
             </div>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-4 py-2 text-xs font-bold text-white shadow-[2px_2px_0px_#111827]">
+          <button
+            type="button"
+            data-arcade-launch="true"
+            onClick={onRequestLaunch}
+            className="inline-flex items-center gap-2 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-4 py-2 text-xs font-bold text-white shadow-[2px_2px_0px_#111827] dark:border-[#38BDF8] whitespace-nowrap shrink-0"
+          >
             <Shield className="h-4 w-4" />
             <span>Play</span>
-          </span>
+          </button>
         </div>
-      </button>
+      </div>
     );
   }
 
   return (
-    <div className="relative h-full min-h-[430px] w-full overflow-hidden rounded-2xl border-2 border-[#111827] bg-[#FAF8F5] shadow-[6px_6px_0px_#111827]">
-      {/* Dedicated WebGL Mount Container — unobstructed center */}
+    <div
+      className={`relative h-full min-h-[430px] w-full overflow-hidden rounded-2xl border-2 transition-colors duration-200 ${
+        darkMode
+          ? 'border-[#334155] bg-[#0B1220] shadow-[6px_6px_0px_#020617]'
+          : 'border-[#111827] bg-[#FAF8F5] shadow-[6px_6px_0px_#111827]'
+      }`}
+    >
+      {/* Dedicated WebGL + Synced CSS3D Mount Container */}
       <div
         ref={mountRef}
-        className={`h-full min-h-[430px] w-full ${hoveredPart ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
-        aria-label="Interactive 3D Jevtel Arcade Machine. Drag to rotate or click the screen to launch gameplay."
+        className={`relative h-full min-h-[430px] w-full ${hoveredPart ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
+        aria-label="Interactive 3D Intel Core Ultra Arcade Machine. Drag to rotate or click the screen or buttons to launch gameplay."
       />
 
-      {/* Minimal Outer-Corner Controls Only (Zero backdrop-blur over WebGL) */}
-      <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg border border-[#111827]/20 bg-[#FAF8F5] px-2.5 py-1.5 text-[11px] font-bold text-[#374151] shadow-xs">
-        <Rotate3d className="h-3.5 w-3.5 text-[#0068B5]" />
+      {/* Discreet Corner Video Audio Toggle */}
+      {videoReady && (
+        <button
+          type="button"
+          data-crt-audio-toggle="true"
+          onClick={handleToggleVideoAudio}
+          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg border border-[#111827]/20 bg-[#FAF8F5] px-2.5 py-1.5 text-[11px] font-bold text-[#111827] shadow-xs transition-colors hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#111827] dark:text-[#F8FAFC] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8] whitespace-nowrap shrink-0"
+        >
+          {globalMuted || videoMuted ? (
+            <>
+              <VolumeX className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
+              <span>{globalMuted ? 'Muted' : 'Tap anywhere for sound'}</span>
+            </>
+          ) : (
+            <>
+              <Volume2 className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
+              <span>Sound On</span>
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Minimal Outer-Corner Controls (Zero backdrop-blur over WebGL) */}
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-lg border border-[#111827]/20 bg-[#FAF8F5] px-2.5 py-1.5 text-[11px] font-bold text-[#374151] shadow-xs dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] whitespace-nowrap shrink-0">
+        <Rotate3d className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
         <span>Drag to rotate</span>
       </div>
 
       <button
         type="button"
-        onClick={onRequestLaunch}
-        className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-3.5 py-1.5 text-xs font-bold text-white shadow-[2px_2px_0px_#111827] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#005291]"
+        data-arcade-launch="true"
+        onClick={() => {
+          cutVideoForLaunch();
+          onRequestLaunch();
+        }}
+        className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-2 rounded-lg border-2 border-[#111827] bg-[#0068B5] px-3.5 py-1.5 text-xs font-bold text-white shadow-[2px_2px_0px_#111827] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#005291] dark:border-[#38BDF8] whitespace-nowrap shrink-0"
       >
         <Play className="h-3.5 w-3.5 fill-white" />
         <span>Play Arcade</span>

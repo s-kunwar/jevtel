@@ -14,6 +14,8 @@ import pillarX86ArcArt from '../assets/images/pillar_x86_arc_bridge_179575533785
 import arcadeMarqueeArt from '../assets/images/arcade_parchment_marquee_1795759348203.jpg';
 import arcadeSideLeftArt from '../assets/images/arcade_side_panel_left_1795757180045.jpg';
 import arcadeSideRightArt from '../assets/images/arcade_side_panel_right_1795757180647.jpg';
+import arcadeFrontTinySwordsArt from '../assets/images/arcade_front_tinyswords_art_1795771491653.jpg';
+import arcadeMarqueeTinySwordsBanner from '../assets/images/arcade_marquee_tinyswords_banner_1795771491151.jpg';
 import doodleNotebookArt from '../assets/images/doodle_notebook_corners_1795757181165.jpg';
 import xrayCoreUltraArt from '../assets/images/xray_core_ultra_series3_1795758713524.jpg';
 import xrayBargainTrapArt from '../assets/images/xray_bargain_thermal_trap_1795758712656.jpg';
@@ -28,6 +30,16 @@ import slotMemoryScrollsArt from '../assets/images/slot_memory_scrolls_179576375
 import slotStorageVaultArt from '../assets/images/slot_storage_vault_1795763760468.jpg';
 import slotCoolingVaporArt from '../assets/images/slot_cooling_vapor_1795763759423.jpg';
 import slotCoolingAirflowArt from '../assets/images/slot_cooling_airflow_1795763761105.jpg';
+import productCampusUltralightArt from '../assets/images/product_campus_ultralight_1795767646402.jpg';
+import productAllrounderArcArt from '../assets/images/product_allrounder_arc_1795767647025.jpg';
+import productCreatorStudioArt from '../assets/images/product_creator_studio_1795767648063.jpg';
+import productGamingXessArt from '../assets/images/product_gaming_xess_1795767648815.jpg';
+import courtyardStallStudentRaw from '../assets/images/courtyard_stall_student_1795770339044.jpg';
+import courtyardStallGamingRaw from '../assets/images/courtyard_stall_gaming_1795770338288.jpg';
+import courtyardStallCreatorRaw from '../assets/images/courtyard_stall_creator_1795770338601.jpg';
+import courtyardStonePlazaRaw from '../assets/images/courtyard_stone_plaza_1795770340532.jpg';
+import courtyardStonePathRaw from '../assets/images/courtyard_stone_path_1795770340743.jpg';
+import courtyardFestivalArchRaw from '../assets/images/courtyard_festival_arch_1795770339425.jpg';
 
 export type FactionColor = 'Blue' | 'Red' | 'Yellow' | 'Purple' | 'Black';
 
@@ -64,12 +76,18 @@ export const EDITORIAL_ART_URLS = {
   slotStorageVault: slotStorageVaultArt,
   slotCoolingVapor: slotCoolingVaporArt,
   slotCoolingAirflow: slotCoolingAirflowArt,
+  productCampusUltralight: productCampusUltralightArt,
+  productAllrounderArc: productAllrounderArcArt,
+  productCreatorStudio: productCreatorStudioArt,
+  productGamingXess: productGamingXessArt,
 };
 
 export const ARCADE_CABINET_ART_URLS = {
   marquee: arcadeMarqueeArt,
   leftPanel: arcadeSideLeftArt,
   rightPanel: arcadeSideRightArt,
+  frontTinySwords: arcadeFrontTinySwordsArt,
+  marqueeTinySwords: arcadeMarqueeTinySwordsBanner,
 };
 
 const TS_BASE = '/assets/tiny_swords';
@@ -219,6 +237,14 @@ export interface TinySwordsAtlas {
     aiPc: HTMLCanvasElement;
     booth: HTMLCanvasElement;
     trapLaptop: HTMLCanvasElement;
+  };
+  courtyard: {
+    stallStudent: HTMLCanvasElement;
+    stallGaming: HTMLCanvasElement;
+    stallCreator: HTMLCanvasElement;
+    stonePlaza: HTMLCanvasElement;
+    stonePath: HTMLCanvasElement;
+    festivalArch: HTMLCanvasElement;
   };
   titleBanner: HTMLImageElement;
 }
@@ -481,6 +507,12 @@ export function loadTinySwordsAtlas(): Promise<TinySwordsAtlas> {
       aiPcRawImg,
       boothRawImg,
       trapLaptopRawImg,
+      stallStudentRawImg,
+      stallGamingRawImg,
+      stallCreatorRawImg,
+      stonePlazaRawImg,
+      stonePathRawImg,
+      festivalArchRawImg,
     ] = await Promise.all([
       Promise.all([1, 2, 3, 4, 5].map((n) => loadImage(enc(`Terrain/Tileset/Tilemap_color${n}.png`)))),
       loadImage(enc('Terrain/Tileset/Water Background color.png')),
@@ -541,12 +573,24 @@ export function loadTinySwordsAtlas(): Promise<TinySwordsAtlas> {
       loadImage(intelAiPcRaw),
       loadImage(aiPcBoothRaw),
       loadImage(trapLaptopRaw),
+      loadImage(courtyardStallStudentRaw),
+      loadImage(courtyardStallGamingRaw),
+      loadImage(courtyardStallCreatorRaw),
+      loadImage(courtyardStonePlazaRaw),
+      loadImage(courtyardStonePathRaw),
+      loadImage(courtyardFestivalArchRaw),
     ]);
 
     const chipCanvas = stripWhiteBackground(chipRawImg, 256);
     const aiPcCanvas = stripWhiteBackground(aiPcRawImg, 280);
     const boothCanvas = stripWhiteBackground(boothRawImg, 360);
     const trapLaptopCanvas = stripWhiteBackground(trapLaptopRawImg, 280);
+    const stallStudentCanvas = stripWhiteBackground(stallStudentRawImg, 460);
+    const stallGamingCanvas = stripWhiteBackground(stallGamingRawImg, 460);
+    const stallCreatorCanvas = stripWhiteBackground(stallCreatorRawImg, 460);
+    const stonePlazaCanvas = stripWhiteBackground(stonePlazaRawImg, 520);
+    const stonePathCanvas = stripWhiteBackground(stonePathRawImg, 380);
+    const festivalArchCanvas = stripWhiteBackground(festivalArchRawImg, 560);
 
     try {
       INTEL_HARDWARE_URLS.chip = chipCanvas.toDataURL('image/png');
@@ -608,6 +652,14 @@ export function loadTinySwordsAtlas(): Promise<TinySwordsAtlas> {
         aiPc: aiPcCanvas,
         booth: boothCanvas,
         trapLaptop: trapLaptopCanvas,
+      },
+      courtyard: {
+        stallStudent: stallStudentCanvas,
+        stallGaming: stallGamingCanvas,
+        stallCreator: stallCreatorCanvas,
+        stonePlaza: stonePlazaCanvas,
+        stonePath: stonePathCanvas,
+        festivalArch: festivalArchCanvas,
       },
       titleBanner,
     };

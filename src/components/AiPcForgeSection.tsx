@@ -136,8 +136,8 @@ function PartArtThumb({
       <div
         className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-lg border ${
           isWarning
-            ? 'border-[#FECACA] bg-[#FEF2F2] text-[#DC2626]'
-            : 'border-[#E5E7EB] bg-[#FAF8F5] text-[#4B5563]'
+            ? 'border-[#FECACA] bg-[#FEF2F2] text-[#DC2626] dark:border-[#7F1D1D] dark:bg-[#450A0A] dark:text-[#FCA5A5]'
+            : 'border-[#E5E7EB] bg-[#FAF8F5] text-[#4B5563] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#94A3B8]'
         }`}
       >
         {fallbackIcon}
@@ -147,14 +147,14 @@ function PartArtThumb({
 
   return (
     <div
-      className={`${sizeClass} shrink-0 overflow-hidden rounded-lg border border-[#111827]/15 bg-[#FAF8F5]`}
+      className={`${sizeClass} shrink-0 overflow-hidden rounded-lg border border-[#111827]/15 bg-[#FAF8F5] dark:border-[#334155] dark:bg-[#0F172A]`}
     >
       <img
         src={src}
         alt={alt}
         referrerPolicy="no-referrer"
         onError={() => setImgFailed(true)}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover dark:brightness-95"
       />
     </div>
   );
@@ -183,16 +183,16 @@ export function AiPcForgeSection({
     WORKLOAD_SCENARIOS.find((s) => s.id === scenario) ?? WORKLOAD_SCENARIOS[0];
 
   const thermalStatusColor = isThrottled
-    ? 'text-[#DC2626]'
+    ? 'text-[#DC2626] dark:text-[#F87171]'
     : isWarm
-      ? 'text-[#B45309]'
-      : 'text-[#059669]';
+      ? 'text-[#B45309] dark:text-[#FBBF24]'
+      : 'text-[#059669] dark:text-[#34D399]';
 
   const thermalBadgeBg = isThrottled
-    ? 'border-[#FECACA] bg-[#FEF2F2] text-[#DC2626]'
+    ? 'border-[#FECACA] bg-[#FEF2F2] text-[#DC2626] dark:border-[#7F1D1D] dark:bg-[#450A0A]/80 dark:text-[#FCA5A5]'
     : isWarm
-      ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309]'
-      : 'border-[#A7F3D0] bg-[#ECFDF5] text-[#059669]';
+      ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309] dark:border-[#78350F] dark:bg-[#451A03]/80 dark:text-[#FCD34D]'
+      : 'border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] dark:border-[#065F46] dark:bg-[#064E3B]/70 dark:text-[#6EE7B7]';
 
   const selectedCpu =
     PROCESSOR_OPTIONS.find((o) => o.id === config.processor) ?? PROCESSOR_OPTIONS[2];
@@ -284,20 +284,20 @@ export function AiPcForgeSection({
   return (
     <section
       id="pc-builder"
-      className="relative overflow-hidden border-y border-[#E5E7EB] bg-[#FAF8F5] py-12 lg:py-16"
+      className="relative overflow-hidden border-y border-[#E5E7EB] bg-[#FAF8F5] py-12 transition-colors duration-200 dark:border-[#1F2937] dark:bg-[#0B1120] lg:py-16"
     >
       <div className="relative mx-auto max-w-[1280px] px-5 md:px-10">
         {/* Section Header + Quick Build Presets */}
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
             <h2
-              className="font-editorial text-3xl font-bold leading-[1.08] tracking-tight text-[#111827] md:text-4xl"
+              className="font-editorial text-3xl font-bold leading-[1.08] tracking-tight text-[#111827] dark:text-[#F3F4F6] md:text-4xl"
               style={{ textWrap: 'balance' }}
             >
               PC Builder &amp; Live Real-World Stress Tests
             </h2>
             <HandUnderline className="mt-1.5 max-w-sm" />
-            <p className="mt-3 text-base leading-relaxed text-[#4B5563]">
+            <p className="mt-3 text-base leading-relaxed text-[#4B5563] dark:text-[#9CA3AF]">
               Customize five real laptop parts on the left, inspect the live internal layout on the
               right, and run six daily tests right below.
             </p>
@@ -317,8 +317,8 @@ export function AiPcForgeSection({
               }
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 config.processor === 'bargain_0'
-                  ? 'border-[#DC2626] bg-[#FEF2F2] text-[#DC2626]'
-                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#DC2626] hover:text-[#DC2626]'
+                  ? 'border-[#DC2626] bg-[#FEF2F2] text-[#DC2626] dark:border-[#F87171] dark:bg-[#450A0A]/60 dark:text-[#FCA5A5]'
+                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#DC2626] hover:text-[#DC2626] dark:border-[#334155] dark:bg-[#111827] dark:text-[#D1D5DB] dark:hover:border-[#F87171] dark:hover:text-[#FCA5A5]'
               }`}
             >
               Test Budget Laptop
@@ -336,8 +336,8 @@ export function AiPcForgeSection({
               }
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 config.processor === 'ultra5_225h' && config.graphics === 'basic_igpu'
-                  ? 'border-[#0068B5] bg-[#EFF6FF] text-[#0068B5]'
-                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#0068B5] hover:text-[#0068B5]'
+                  ? 'border-[#0068B5] bg-[#EFF6FF] text-[#0068B5] dark:border-[#38BDF8] dark:bg-[#1E3A8A]/35 dark:text-[#7DD3FC]'
+                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#111827] dark:text-[#D1D5DB] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8]'
               }`}
             >
               Student Ultrabook
@@ -355,8 +355,8 @@ export function AiPcForgeSection({
               }
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 config.processor === 'ultra7_355' && config.graphics === 'arc_b390_xess'
-                  ? 'border-[#0068B5] bg-[#EFF6FF] text-[#0068B5]'
-                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#0068B5] hover:text-[#0068B5]'
+                  ? 'border-[#0068B5] bg-[#EFF6FF] text-[#0068B5] dark:border-[#38BDF8] dark:bg-[#1E3A8A]/35 dark:text-[#7DD3FC]'
+                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#0068B5] hover:text-[#0068B5] dark:border-[#334155] dark:bg-[#111827] dark:text-[#D1D5DB] dark:hover:border-[#38BDF8] dark:hover:text-[#38BDF8]'
               }`}
             >
               Core Ultra 7 All-Rounder
@@ -374,8 +374,8 @@ export function AiPcForgeSection({
               }
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 config.processor === 'ultra_x9_388h' && config.graphics === 'rtx_4060'
-                  ? 'border-[#059669] bg-[#ECFDF5] text-[#059669]'
-                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#059669] hover:text-[#059669]'
+                  ? 'border-[#059669] bg-[#ECFDF5] text-[#059669] dark:border-[#34D399] dark:bg-[#064E3B]/50 dark:text-[#6EE7B7]'
+                  : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#059669] hover:text-[#059669] dark:border-[#334155] dark:bg-[#111827] dark:text-[#D1D5DB] dark:hover:border-[#34D399] dark:hover:text-[#6EE7B7]'
               }`}
             >
               Creator RTX Rig
@@ -386,13 +386,13 @@ export function AiPcForgeSection({
         {/* ROW 1: 5-Slot Hardware Selector (5 cols) + Large Featured Cutaway Stage (7 cols) */}
         <div className="mt-8 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
           {/* LEFT PANEL: 5 Real-World Hardware Slots */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-5 lg:col-span-5">
+          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-5 transition-colors dark:border-[#1F2937] dark:bg-[#111827] lg:col-span-5">
             <div>
-              <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
-                <h3 className="font-editorial text-lg font-bold text-[#111827]">
+              <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3 dark:border-[#1F2937]">
+                <h3 className="font-editorial text-lg font-bold text-[#111827] dark:text-[#F3F4F6]">
                   Customize Laptop Parts
                 </h3>
-                <span className="font-mono-tabular text-[11px] font-semibold text-[#6B7280]">
+                <span className="font-mono-tabular text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
                   5 Hardware Slots
                 </span>
               </div>
@@ -401,7 +401,7 @@ export function AiPcForgeSection({
               <div
                 role="tablist"
                 aria-label="Hardware customization slots"
-                className="mt-4 grid grid-cols-5 gap-1 rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] p-1"
+                className="mt-4 grid grid-cols-5 gap-1 rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] p-1 dark:border-[#334155] dark:bg-[#0F172A]"
               >
                 {SLOT_TABS.map((tab) => {
                   const active = activeSlot === tab.key;
@@ -414,8 +414,8 @@ export function AiPcForgeSection({
                       onClick={() => setActiveSlot(tab.key)}
                       className={`rounded-md px-1.5 py-2 text-[11px] font-bold transition-colors whitespace-nowrap truncate ${
                         active
-                          ? 'bg-white text-[#0068B5] shadow-xs'
-                          : 'text-[#4B5563] hover:text-[#111827]'
+                          ? 'bg-white text-[#0068B5] shadow-xs dark:bg-[#1E293B] dark:text-[#38BDF8]'
+                          : 'text-[#4B5563] hover:text-[#111827] dark:text-[#94A3B8] dark:hover:text-[#F3F4F6]'
                       }`}
                     >
                       {tab.label}
@@ -437,9 +437,9 @@ export function AiPcForgeSection({
                         className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                           active
                             ? opt.isBargain
-                              ? 'border-[#DC2626] bg-[#FEF2F2] ring-1 ring-[#DC2626]/25'
-                              : 'border-[#0068B5] bg-[#EFF6FF] ring-1 ring-[#0068B5]/25'
-                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF]'
+                              ? 'border-[#DC2626] bg-[#FEF2F2] ring-1 ring-[#DC2626]/25 dark:border-[#F87171] dark:bg-[#450A0A]/50 dark:ring-[#F87171]/30'
+                              : 'border-[#0068B5] bg-[#EFF6FF] ring-1 ring-[#0068B5]/25 dark:border-[#38BDF8] dark:bg-[#1E3A8A]/35 dark:ring-[#38BDF8]/30'
+                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#64748B]'
                         }`}
                       >
                         <PartArtThumb
@@ -450,22 +450,22 @@ export function AiPcForgeSection({
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-xs font-bold text-[#111827]">
+                            <span className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
                               {opt.label}
                             </span>
                             <span
                               className={`font-mono-tabular text-[10px] font-bold shrink-0 ${
                                 active
                                   ? opt.isBargain
-                                    ? 'text-[#DC2626]'
-                                    : 'text-[#0068B5]'
-                                  : 'text-[#6B7280]'
+                                    ? 'text-[#DC2626] dark:text-[#FCA5A5]'
+                                    : 'text-[#0068B5] dark:text-[#38BDF8]'
+                                  : 'text-[#6B7280] dark:text-[#9CA3AF]'
                               }`}
                             >
                               {opt.tierHint}
                             </span>
                           </div>
-                          <div className="mt-0.5 text-[11px] text-[#4B5563]">{opt.shortTag}</div>
+                          <div className="mt-0.5 text-[11px] text-[#4B5563] dark:text-[#9CA3AF]">{opt.shortTag}</div>
                         </div>
                       </button>
                     );
@@ -482,9 +482,9 @@ export function AiPcForgeSection({
                         className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                           active
                             ? opt.isBargain
-                              ? 'border-[#D97706] bg-[#FFFBEB] ring-1 ring-[#D97706]/25'
-                              : 'border-[#0068B5] bg-[#EFF6FF] ring-1 ring-[#0068B5]/25'
-                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF]'
+                              ? 'border-[#D97706] bg-[#FFFBEB] ring-1 ring-[#D97706]/25 dark:border-[#FBBF24] dark:bg-[#451A03]/50 dark:ring-[#FBBF24]/30'
+                              : 'border-[#0068B5] bg-[#EFF6FF] ring-1 ring-[#0068B5]/25 dark:border-[#38BDF8] dark:bg-[#1E3A8A]/35 dark:ring-[#38BDF8]/30'
+                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#64748B]'
                         }`}
                       >
                         <PartArtThumb
@@ -495,22 +495,22 @@ export function AiPcForgeSection({
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-xs font-bold text-[#111827]">
+                            <span className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
                               {opt.label}
                             </span>
                             <span
                               className={`font-mono-tabular text-[10px] font-bold shrink-0 ${
                                 active
                                   ? opt.isBargain
-                                    ? 'text-[#B45309]'
-                                    : 'text-[#0068B5]'
-                                  : 'text-[#6B7280]'
+                                    ? 'text-[#B45309] dark:text-[#FCD34D]'
+                                    : 'text-[#0068B5] dark:text-[#38BDF8]'
+                                  : 'text-[#6B7280] dark:text-[#9CA3AF]'
                               }`}
                             >
                               {opt.tierHint}
                             </span>
                           </div>
-                          <div className="mt-0.5 text-[11px] text-[#4B5563]">{opt.shortTag}</div>
+                          <div className="mt-0.5 text-[11px] text-[#4B5563] dark:text-[#9CA3AF]">{opt.shortTag}</div>
                         </div>
                       </button>
                     );
@@ -527,9 +527,9 @@ export function AiPcForgeSection({
                         className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                           active
                             ? opt.isBargain
-                              ? 'border-[#D97706] bg-[#FFFBEB] ring-1 ring-[#D97706]/25'
-                              : 'border-[#059669] bg-[#ECFDF5] ring-1 ring-[#059669]/25'
-                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF]'
+                              ? 'border-[#D97706] bg-[#FFFBEB] ring-1 ring-[#D97706]/25 dark:border-[#FBBF24] dark:bg-[#451A03]/50 dark:ring-[#FBBF24]/30'
+                              : 'border-[#059669] bg-[#ECFDF5] ring-1 ring-[#059669]/25 dark:border-[#34D399] dark:bg-[#064E3B]/45 dark:ring-[#34D399]/30'
+                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#64748B]'
                         }`}
                       >
                         <PartArtThumb
@@ -540,22 +540,22 @@ export function AiPcForgeSection({
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-xs font-bold text-[#111827]">
+                            <span className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
                               {opt.label}
                             </span>
                             <span
                               className={`font-mono-tabular text-[10px] font-bold shrink-0 ${
                                 active
                                   ? opt.isBargain
-                                    ? 'text-[#B45309]'
-                                    : 'text-[#059669]'
-                                  : 'text-[#6B7280]'
+                                    ? 'text-[#B45309] dark:text-[#FCD34D]'
+                                    : 'text-[#059669] dark:text-[#6EE7B7]'
+                                  : 'text-[#6B7280] dark:text-[#9CA3AF]'
                               }`}
                             >
                               {opt.tierHint}
                             </span>
                           </div>
-                          <div className="mt-0.5 text-[11px] text-[#4B5563]">{opt.shortTag}</div>
+                          <div className="mt-0.5 text-[11px] text-[#4B5563] dark:text-[#9CA3AF]">{opt.shortTag}</div>
                         </div>
                       </button>
                     );
@@ -571,8 +571,8 @@ export function AiPcForgeSection({
                         onClick={() => onChangeConfig({ ...config, storage: opt.id })}
                         className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                           active
-                            ? 'border-[#0068B5] bg-[#EFF6FF] ring-1 ring-[#0068B5]/25'
-                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF]'
+                            ? 'border-[#0068B5] bg-[#EFF6FF] ring-1 ring-[#0068B5]/25 dark:border-[#38BDF8] dark:bg-[#1E3A8A]/35 dark:ring-[#38BDF8]/30'
+                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#64748B]'
                         }`}
                       >
                         <PartArtThumb
@@ -582,18 +582,18 @@ export function AiPcForgeSection({
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-xs font-bold text-[#111827]">
+                            <span className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
                               {opt.label}
                             </span>
                             <span
                               className={`font-mono-tabular text-[10px] font-bold shrink-0 ${
-                                active ? 'text-[#0068B5]' : 'text-[#6B7280]'
+                                active ? 'text-[#0068B5] dark:text-[#38BDF8]' : 'text-[#6B7280] dark:text-[#9CA3AF]'
                               }`}
                             >
                               {opt.tierHint}
                             </span>
                           </div>
-                          <div className="mt-0.5 text-[11px] text-[#4B5563]">{opt.shortTag}</div>
+                          <div className="mt-0.5 text-[11px] text-[#4B5563] dark:text-[#9CA3AF]">{opt.shortTag}</div>
                         </div>
                       </button>
                     );
@@ -610,9 +610,9 @@ export function AiPcForgeSection({
                         className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                           active
                             ? opt.isBargain
-                              ? 'border-[#D97706] bg-[#FFFBEB] ring-1 ring-[#D97706]/25'
-                              : 'border-[#059669] bg-[#ECFDF5] ring-1 ring-[#059669]/25'
-                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF]'
+                              ? 'border-[#D97706] bg-[#FFFBEB] ring-1 ring-[#D97706]/25 dark:border-[#FBBF24] dark:bg-[#451A03]/50 dark:ring-[#FBBF24]/30'
+                              : 'border-[#059669] bg-[#ECFDF5] ring-1 ring-[#059669]/25 dark:border-[#34D399] dark:bg-[#064E3B]/45 dark:ring-[#34D399]/30'
+                            : 'border-[#E5E7EB] bg-[#FAF8F5] hover:border-[#9CA3AF] dark:border-[#334155] dark:bg-[#0F172A] dark:hover:border-[#64748B]'
                         }`}
                       >
                         <PartArtThumb
@@ -623,22 +623,22 @@ export function AiPcForgeSection({
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-xs font-bold text-[#111827]">
+                            <span className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
                               {opt.label}
                             </span>
                             <span
                               className={`font-mono-tabular text-[10px] font-bold shrink-0 ${
                                 active
                                   ? opt.isBargain
-                                    ? 'text-[#B45309]'
-                                    : 'text-[#059669]'
-                                  : 'text-[#6B7280]'
+                                    ? 'text-[#B45309] dark:text-[#FCD34D]'
+                                    : 'text-[#059669] dark:text-[#6EE7B7]'
+                                  : 'text-[#6B7280] dark:text-[#9CA3AF]'
                               }`}
                             >
                               {opt.tierHint}
                             </span>
                           </div>
-                          <div className="mt-0.5 text-[11px] text-[#4B5563]">{opt.shortTag}</div>
+                          <div className="mt-0.5 text-[11px] text-[#4B5563] dark:text-[#9CA3AF]">{opt.shortTag}</div>
                         </div>
                       </button>
                     );
@@ -647,80 +647,80 @@ export function AiPcForgeSection({
             </div>
 
             {/* Interactive 5-Slot Build Manifest (click any row to edit that slot) */}
-            <div className="mt-5 border-t border-[#E5E7EB] pt-4">
-              <div className="mb-2 text-[11px] font-bold text-[#6B7280]">
+            <div className="mt-5 border-t border-[#E5E7EB] pt-4 dark:border-[#1F2937]">
+              <div className="mb-2 text-[11px] font-bold text-[#6B7280] dark:text-[#9CA3AF]">
                 Active Build (click any row to swap)
               </div>
-              <div className="divide-y divide-[#E5E7EB] text-xs">
+              <div className="divide-y divide-[#E5E7EB] text-xs dark:divide-[#1F2937]">
                 <button
                   type="button"
                   onClick={() => setActiveSlot('processor')}
-                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5]"
+                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5] dark:hover:text-[#38BDF8]"
                 >
-                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280]">
-                    <Cpu className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+                    <Cpu className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>Processor</span>
                   </span>
-                  <span className="truncate font-semibold text-[#111827]">{selectedCpu.label}</span>
+                  <span className="truncate font-semibold text-[#111827] dark:text-[#F3F4F6]">{selectedCpu.label}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSlot('graphics')}
-                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5]"
+                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5] dark:hover:text-[#38BDF8]"
                 >
-                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280]">
-                    <MonitorPlay className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+                    <MonitorPlay className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>Graphics</span>
                   </span>
-                  <span className="truncate font-semibold text-[#111827]">{selectedGpu.label}</span>
+                  <span className="truncate font-semibold text-[#111827] dark:text-[#F3F4F6]">{selectedGpu.label}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSlot('memory')}
-                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5]"
+                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5] dark:hover:text-[#38BDF8]"
                 >
-                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280]">
-                    <MemoryStick className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+                    <MemoryStick className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>Memory</span>
                   </span>
-                  <span className="truncate font-semibold text-[#111827]">{selectedMem.label}</span>
+                  <span className="truncate font-semibold text-[#111827] dark:text-[#F3F4F6]">{selectedMem.label}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSlot('storage')}
-                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5]"
+                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5] dark:hover:text-[#38BDF8]"
                 >
-                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280]">
-                    <HardDrive className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+                    <HardDrive className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>Storage</span>
                   </span>
-                  <span className="truncate font-semibold text-[#111827]">{selectedSsd.label}</span>
+                  <span className="truncate font-semibold text-[#111827] dark:text-[#F3F4F6]">{selectedSsd.label}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSlot('cooling')}
-                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5]"
+                  className="flex w-full items-center justify-between gap-3 py-1.5 text-left hover:text-[#0068B5] dark:hover:text-[#38BDF8]"
                 >
-                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280]">
-                    <Wind className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+                    <Wind className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>Cooling</span>
                   </span>
-                  <span className="truncate font-semibold text-[#111827]">{selectedCool.label}</span>
+                  <span className="truncate font-semibold text-[#111827] dark:text-[#F3F4F6]">{selectedCool.label}</span>
                 </button>
               </div>
             </div>
           </div>
 
           {/* RIGHT STAGE: Large Featured Laptop Cutaway (7 cols) with Leader-Line Corner Pins */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-5 lg:col-span-7">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] pb-3">
+          <div className="flex flex-col justify-between rounded-2xl border border-[#E5E7EB] bg-white p-5 transition-colors dark:border-[#1F2937] dark:bg-[#111827] lg:col-span-7">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] pb-3 dark:border-[#1F2937]">
               <div>
-                <h3 className="font-editorial text-lg font-bold text-[#111827]">
+                <h3 className="font-editorial text-lg font-bold text-[#111827] dark:text-[#F3F4F6]">
                   Inside Your Custom Laptop
                 </h3>
               </div>
               <div className="flex items-center gap-3">
-                <span className="font-mono-tabular text-xs font-semibold text-[#4B5563]">
+                <span className="font-mono-tabular text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">
                   {benchmark.airflowLabel}
                 </span>
                 <span
@@ -737,7 +737,7 @@ export function AiPcForgeSection({
             </div>
 
             {/* Wide Cutaway Stage */}
-            <div className="relative mt-4 w-full overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#FAF8F5] aspect-[4/3]">
+            <div className="relative mt-4 w-full overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#FAF8F5] aspect-[4/3] dark:border-[#334155] dark:bg-[#18181B]">
               {!xrayImgError ? (
                 cutawayImages.map((imgItem) => (
                   <img
@@ -746,15 +746,15 @@ export function AiPcForgeSection({
                     alt={imgItem.alt}
                     referrerPolicy="no-referrer"
                     onError={() => setXrayImgError(true)}
-                    className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                    className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 dark:brightness-95 ${
                       cutawayKey === imgItem.key ? 'opacity-100' : 'opacity-0'
                     }`}
                   />
                 ))
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center">
-                  <Cpu className="h-12 w-12 text-[#0068B5]" />
-                  <span className="font-editorial text-xl font-bold text-[#111827]">
+                  <Cpu className="h-12 w-12 text-[#0068B5] dark:text-[#38BDF8]" />
+                  <span className="font-editorial text-xl font-bold text-[#111827] dark:text-[#F3F4F6]">
                     {selectedCpu.label} · {selectedGpu.label}
                   </span>
                 </div>
@@ -894,20 +894,20 @@ export function AiPcForgeSection({
               </svg>
 
               {/* 4 Clean Corner Callout Pins (Edge-Anchored, Never Covering Center Hardware) */}
-              <div className="pointer-events-none absolute top-3 left-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 backdrop-blur-xs">
-                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280]">
+              <div className="pointer-events-none absolute top-3 left-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 backdrop-blur-xs dark:border-[#334155] dark:bg-[#0F172A]/92">
+                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280] dark:text-[#9CA3AF]">
                   Main Processor
                 </div>
-                <div className="truncate text-[11px] font-bold text-[#111827]">
+                <div className="truncate text-[11px] font-bold text-[#111827] dark:text-[#F3F4F6]">
                   {isBargainCpu ? 'Budget (Hot)' : selectedCpu.label.replace('Intel ', '')}
                 </div>
               </div>
 
-              <div className="pointer-events-none absolute top-3 right-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 text-right backdrop-blur-xs">
-                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280]">
+              <div className="pointer-events-none absolute top-3 right-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 text-right backdrop-blur-xs dark:border-[#334155] dark:bg-[#0F172A]/92">
+                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280] dark:text-[#9CA3AF]">
                   Graphics + AI
                 </div>
-                <div className="truncate text-[11px] font-bold text-[#111827]">
+                <div className="truncate text-[11px] font-bold text-[#111827] dark:text-[#F3F4F6]">
                   {config.graphics === 'rtx_4060'
                     ? 'RTX 4060'
                     : config.graphics === 'arc_b390_xess'
@@ -918,24 +918,26 @@ export function AiPcForgeSection({
                 </div>
               </div>
 
-              <div className="pointer-events-none absolute bottom-3 left-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 backdrop-blur-xs">
-                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280]">
+              <div className="pointer-events-none absolute bottom-3 left-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 backdrop-blur-xs dark:border-[#334155] dark:bg-[#0F172A]/92">
+                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280] dark:text-[#9CA3AF]">
                   4-Hr Battery
                 </div>
                 <div
                   className={`font-mono-tabular text-[11px] font-bold ${
-                    benchmark.batteryAfter4HrPct < 35 ? 'text-[#DC2626]' : 'text-[#059669]'
+                    benchmark.batteryAfter4HrPct < 35
+                      ? 'text-[#DC2626] dark:text-[#F87171]'
+                      : 'text-[#059669] dark:text-[#34D399]'
                   }`}
                 >
                   {benchmark.batteryAfter4HrPct}% Left
                 </div>
               </div>
 
-              <div className="pointer-events-none absolute right-3 bottom-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 text-right backdrop-blur-xs">
-                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280]">
+              <div className="pointer-events-none absolute right-3 bottom-3 max-w-[44%] rounded-md border border-[#111827]/20 bg-[#FAF8F5]/92 px-2.5 py-1.5 text-right backdrop-blur-xs dark:border-[#334155] dark:bg-[#0F172A]/92">
+                <div className="font-mono-tabular text-[10px] font-bold text-[#6B7280] dark:text-[#9CA3AF]">
                   Memory &amp; Cooling
                 </div>
-                <div className="truncate text-[11px] font-bold text-[#111827]">
+                <div className="truncate text-[11px] font-bold text-[#111827] dark:text-[#F3F4F6]">
                   {selectedMem.label.replace(' Dual-Channel Memory', '').replace(' High-Speed Memory', '').replace(' Memory', '')}
                   {' · '}
                   {benchmark.fanLabel}
@@ -945,7 +947,7 @@ export function AiPcForgeSection({
 
             {/* Cutaway Spotlight Badges: Active Processor Crest + Active Customization Art */}
             <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2">
+              <div className="flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 dark:border-[#334155] dark:bg-[#0F172A]">
                 <PartArtThumb
                   artKey={selectedCpu.artKey}
                   alt={`Pen-and-ink crest for ${selectedCpu.label}`}
@@ -954,20 +956,20 @@ export function AiPcForgeSection({
                   isWarning={selectedCpu.isBargain}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#6B7280]">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
                     <span>Processor Crest</span>
                     <span aria-hidden="true">·</span>
-                    <span className="font-mono-tabular font-bold text-[#0068B5]">
+                    <span className="font-mono-tabular font-bold text-[#0068B5] dark:text-[#38BDF8]">
                       {selectedCpu.tierHint}
                     </span>
                   </div>
-                  <div className="truncate text-xs font-bold text-[#111827]">
+                  <div className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
                     {selectedCpu.label}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2">
+              <div className="flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 dark:border-[#334155] dark:bg-[#0F172A]">
                 <PartArtThumb
                   artKey={activeTabSpotlight.artKey}
                   alt={`Pen-and-ink illustration for ${activeTabSpotlight.label}`}
@@ -975,14 +977,14 @@ export function AiPcForgeSection({
                   sizeClass="h-12 w-12"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#6B7280]">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
                     <span>{activeTabSpotlight.slotTitle}</span>
                     <span aria-hidden="true">·</span>
-                    <span className="font-mono-tabular font-bold text-[#059669]">
+                    <span className="font-mono-tabular font-bold text-[#059669] dark:text-[#34D399]">
                       {activeTabSpotlight.tierHint}
                     </span>
                   </div>
-                  <div className="truncate text-xs font-bold text-[#111827]">
+                  <div className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
                     {activeTabSpotlight.label}
                   </div>
                 </div>
@@ -990,30 +992,32 @@ export function AiPcForgeSection({
             </div>
 
             {/* Clean Telemetry Bar Directly Below Cutaway */}
-            <div className="mt-3.5 flex flex-wrap items-center justify-between gap-4 border-t border-[#E5E7EB] pt-3.5 text-xs">
+            <div className="mt-3.5 flex flex-wrap items-center justify-between gap-4 border-t border-[#E5E7EB] pt-3.5 text-xs dark:border-[#1F2937]">
               <div className="flex items-center gap-2">
                 <Fan
                   className={`h-4 w-4 shrink-0 ${
                     isThrottled
-                      ? 'animate-fan-shake text-[#DC2626]'
-                      : 'animate-fan-spin text-[#0068B5]'
+                      ? 'animate-fan-shake text-[#DC2626] dark:text-[#F87171]'
+                      : 'animate-fan-spin text-[#0068B5] dark:text-[#38BDF8]'
                   }`}
                 />
-                <span className="font-semibold text-[#111827]">{benchmark.fanLabel}</span>
-                <span className="font-mono-tabular text-[#6B7280]">({benchmark.fanSpeedPct}% speed)</span>
+                <span className="font-semibold text-[#111827] dark:text-[#F3F4F6]">{benchmark.fanLabel}</span>
+                <span className="font-mono-tabular text-[#6B7280] dark:text-[#9CA3AF]">({benchmark.fanSpeedPct}% speed)</span>
               </div>
 
               <div className="flex items-center gap-2">
                 {benchmark.batteryAfter4HrPct <= 35 ? (
-                  <BatteryWarning className="h-4 w-4 text-[#DC2626]" />
+                  <BatteryWarning className="h-4 w-4 text-[#DC2626] dark:text-[#F87171]" />
                 ) : (
-                  <BatteryCharging className="h-4 w-4 text-[#059669]" />
+                  <BatteryCharging className="h-4 w-4 text-[#059669] dark:text-[#34D399]" />
                 )}
-                <span className="font-semibold text-[#374151]">
+                <span className="font-semibold text-[#374151] dark:text-[#D1D5DB]">
                   4-Hour Battery Remaining:{' '}
                   <span
                     className={`font-mono-tabular font-bold ${
-                      benchmark.batteryAfter4HrPct <= 35 ? 'text-[#DC2626]' : 'text-[#059669]'
+                      benchmark.batteryAfter4HrPct <= 35
+                        ? 'text-[#DC2626] dark:text-[#F87171]'
+                        : 'text-[#059669] dark:text-[#34D399]'
                     }`}
                   >
                     {benchmark.batteryAfter4HrPct}%
@@ -1025,21 +1029,21 @@ export function AiPcForgeSection({
         </div>
 
         {/* ROW 2: Full-Width Real-World Workload Tests (Left) & Animated Benchmarks (Right) */}
-        <div className="mt-6 rounded-2xl border border-[#E5E7EB] bg-white p-5 md:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E5E7EB] pb-4">
+        <div className="mt-6 rounded-2xl border border-[#E5E7EB] bg-white p-5 transition-colors dark:border-[#1F2937] dark:bg-[#111827] md:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E5E7EB] pb-4 dark:border-[#1F2937]">
             <div>
-              <h3 className="font-editorial text-xl font-bold text-[#111827]">
+              <h3 className="font-editorial text-xl font-bold text-[#111827] dark:text-[#F3F4F6]">
                 Real-World Workload Stress Tests
               </h3>
-              <p className="mt-0.5 text-xs text-[#4B5563]">
+              <p className="mt-0.5 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
                 {activeScenarioMeta.subtitle}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
               {/* Intel XeSS Boost Switch */}
-              <div className="flex items-center gap-2.5 rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-1.5">
-                <span className="text-xs font-bold text-[#111827]">Intel XeSS Frame Boost</span>
+              <div className="flex items-center gap-2.5 rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-1.5 dark:border-[#334155] dark:bg-[#0F172A]">
+                <span className="text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">Intel XeSS Frame Boost</span>
                 <button
                   type="button"
                   role="switch"
@@ -1048,7 +1052,7 @@ export function AiPcForgeSection({
                   className={`rounded-md border px-2.5 py-1 font-mono-tabular text-[11px] font-bold transition-colors whitespace-nowrap shrink-0 ${
                     xessEnabled
                       ? 'border-[#0068B5] bg-[#0068B5] text-white'
-                      : 'border-[#CBD5E1] bg-white text-[#4B5563]'
+                      : 'border-[#CBD5E1] bg-white text-[#4B5563] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]'
                   }`}
                 >
                   {xessEnabled ? 'ON' : 'OFF'}
@@ -1080,15 +1084,15 @@ export function AiPcForgeSection({
                       onClick={() => onChangeScenario(item.id)}
                       className={`rounded-xl border px-3.5 py-3 text-left transition-colors ${
                         active
-                          ? 'border-[#111827] bg-[#111827] text-white'
-                          : 'border-[#E5E7EB] bg-[#FAF8F5] text-[#1F2937] hover:border-[#111827]'
+                          ? 'border-[#111827] bg-[#111827] text-white dark:border-[#38BDF8] dark:bg-[#0068B5] dark:text-white'
+                          : 'border-[#E5E7EB] bg-[#FAF8F5] text-[#1F2937] hover:border-[#111827] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#E5E7EB] dark:hover:border-[#64748B]'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-bold leading-snug">{item.label}</span>
                         <Zap
                           className={`h-3.5 w-3.5 shrink-0 ${
-                            active ? 'text-[#38BDF8]' : 'text-[#9CA3AF]'
+                            active ? 'text-[#38BDF8]' : 'text-[#9CA3AF] dark:text-[#64748B]'
                           }`}
                         />
                       </div>
@@ -1101,10 +1105,10 @@ export function AiPcForgeSection({
               <div
                 className={`rounded-xl border p-4 text-xs leading-relaxed ${
                   isThrottled
-                    ? 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'
+                    ? 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B] dark:border-[#7F1D1D] dark:bg-[#450A0A]/55 dark:text-[#FCA5A5]'
                     : isWarm
-                      ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]'
-                      : 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1E3A8A]'
+                      ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E] dark:border-[#78350F] dark:bg-[#451A03]/55 dark:text-[#FCD34D]'
+                      : 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1E3A8A] dark:border-[#1E40AF] dark:bg-[#1E3A8A]/30 dark:text-[#BFDBFE]'
                 }`}
               >
                 <span className="font-bold">Live Hardware Diagnosis: </span>
@@ -1117,22 +1121,24 @@ export function AiPcForgeSection({
               {/* Bar 1: Offline AI Speed */}
               <div>
                 <div className="flex items-baseline justify-between text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151]">
-                    <Sparkles className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151] dark:text-[#D1D5DB]">
+                    <Sparkles className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>Offline AI Speed</span>
                   </span>
                   <span
                     className={`font-mono-tabular font-bold ${
-                      benchmark.tokensPerSec < 15 ? 'text-[#DC2626]' : 'text-[#0068B5]'
+                      benchmark.tokensPerSec < 15
+                        ? 'text-[#DC2626] dark:text-[#F87171]'
+                        : 'text-[#0068B5] dark:text-[#38BDF8]'
                     }`}
                   >
                     {benchmark.tokensPerSec} answers/sec
                   </span>
                 </div>
-                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
+                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-[#1F2937]">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      benchmark.tokensPerSec < 15 ? 'bg-[#DC2626]' : 'bg-[#0068B5]'
+                      benchmark.tokensPerSec < 15 ? 'bg-[#DC2626]' : 'bg-[#0068B5] dark:bg-[#38BDF8]'
                     }`}
                     style={{
                       width: `${Math.min(100, Math.round((benchmark.tokensPerSec / benchmark.tokensMax) * 100))}%`,
@@ -1144,30 +1150,30 @@ export function AiPcForgeSection({
               {/* Bar 2: Gaming & App Smoothness */}
               <div>
                 <div className="flex items-baseline justify-between text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151]">
-                    <Gauge className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151] dark:text-[#D1D5DB]">
+                    <Gauge className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>Gaming &amp; Motion Smoothness</span>
                   </span>
                   <span
                     className={`font-mono-tabular font-bold ${
                       benchmark.fps < 35
-                        ? 'text-[#DC2626]'
+                        ? 'text-[#DC2626] dark:text-[#F87171]'
                         : benchmark.fps >= 85
-                          ? 'text-[#059669]'
-                          : 'text-[#0068B5]'
+                          ? 'text-[#059669] dark:text-[#34D399]'
+                          : 'text-[#0068B5] dark:text-[#38BDF8]'
                     }`}
                   >
                     {benchmark.fps} FPS
                   </span>
                 </div>
-                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
+                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-[#1F2937]">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
                       benchmark.fps < 35
                         ? 'bg-[#DC2626]'
                         : benchmark.fps >= 85
-                          ? 'bg-[#059669]'
-                          : 'bg-[#0068B5]'
+                          ? 'bg-[#059669] dark:bg-[#34D399]'
+                          : 'bg-[#0068B5] dark:bg-[#38BDF8]'
                     }`}
                     style={{
                       width: `${Math.min(100, Math.round((benchmark.fps / benchmark.fpsMax) * 100))}%`,
@@ -1179,22 +1185,24 @@ export function AiPcForgeSection({
               {/* Bar 3: Battery Left After 4 Hours */}
               <div>
                 <div className="flex items-baseline justify-between text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151]">
-                    <BatteryCharging className="h-3.5 w-3.5 text-[#059669]" />
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151] dark:text-[#D1D5DB]">
+                    <BatteryCharging className="h-3.5 w-3.5 text-[#059669] dark:text-[#34D399]" />
                     <span>Battery Left (After 4 Hours)</span>
                   </span>
                   <span
                     className={`font-mono-tabular font-bold ${
-                      benchmark.batteryAfter4HrPct < 35 ? 'text-[#DC2626]' : 'text-[#059669]'
+                      benchmark.batteryAfter4HrPct < 35
+                        ? 'text-[#DC2626] dark:text-[#F87171]'
+                        : 'text-[#059669] dark:text-[#34D399]'
                     }`}
                   >
                     {benchmark.batteryAfter4HrPct}%
                   </span>
                 </div>
-                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
+                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-[#1F2937]">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      benchmark.batteryAfter4HrPct < 35 ? 'bg-[#DC2626]' : 'bg-[#059669]'
+                      benchmark.batteryAfter4HrPct < 35 ? 'bg-[#DC2626]' : 'bg-[#059669] dark:bg-[#34D399]'
                     }`}
                     style={{ width: `${benchmark.batteryAfter4HrPct}%` }}
                   />
@@ -1204,17 +1212,17 @@ export function AiPcForgeSection({
               {/* Bar 4: App & File Load Speed (SSD + Memory) */}
               <div>
                 <div className="flex items-baseline justify-between text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151]">
-                    <HardDrive className="h-3.5 w-3.5 text-[#0068B5]" />
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151] dark:text-[#D1D5DB]">
+                    <HardDrive className="h-3.5 w-3.5 text-[#0068B5] dark:text-[#38BDF8]" />
                     <span>App &amp; File Load Speed</span>
                   </span>
-                  <span className="font-mono-tabular font-bold text-[#0068B5]">
+                  <span className="font-mono-tabular font-bold text-[#0068B5] dark:text-[#38BDF8]">
                     {benchmark.storageSpeedLabel} ({benchmark.storageSpeedPct}%)
                   </span>
                 </div>
-                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
+                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-[#1F2937]">
                   <div
-                    className="h-full rounded-full bg-[#0068B5] transition-all duration-300"
+                    className="h-full rounded-full bg-[#0068B5] transition-all duration-300 dark:bg-[#38BDF8]"
                     style={{ width: `${benchmark.storageSpeedPct}%` }}
                   />
                 </div>
@@ -1222,29 +1230,29 @@ export function AiPcForgeSection({
 
               {/* Bar 5: Cooling & Windows Compatibility */}
               <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
-                <div className="rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-[#4B5563]">
+                <div className="rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 dark:border-[#334155] dark:bg-[#0F172A]">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-[#4B5563] dark:text-[#9CA3AF]">
                     <span>Cooling Effort</span>
                     <span className={`font-mono-tabular font-bold ${thermalStatusColor}`}>
                       {benchmark.fanSpeedPct}%
                     </span>
                   </div>
-                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB]">
+                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-[#1F2937]">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
-                        isThrottled ? 'bg-[#DC2626]' : isWarm ? 'bg-[#D97706]' : 'bg-[#059669]'
+                        isThrottled ? 'bg-[#DC2626]' : isWarm ? 'bg-[#D97706]' : 'bg-[#059669] dark:bg-[#34D399]'
                       }`}
                       style={{ width: `${benchmark.fanSpeedPct}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151]">
-                    <ShieldCheck className="h-3.5 w-3.5 text-[#059669]" />
+                <div className="flex items-center justify-between rounded-lg border border-[#E5E7EB] bg-[#FAF8F5] px-3 py-2 text-xs dark:border-[#334155] dark:bg-[#0F172A]">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#374151] dark:text-[#D1D5DB]">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#059669] dark:text-[#34D399]" />
                     <span>Windows Apps</span>
                   </span>
-                  <span className="inline-flex items-center gap-1 font-mono-tabular font-bold text-[#059669]">
+                  <span className="inline-flex items-center gap-1 font-mono-tabular font-bold text-[#059669] dark:text-[#34D399]">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     <span>{benchmark.x86CompatibilityPct}% Native</span>
                   </span>
