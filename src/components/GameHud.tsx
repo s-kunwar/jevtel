@@ -162,41 +162,6 @@ export function GameHud({ hud, muted, onToggleMute, onPause, onOpenStoreModal }:
         </div>
       )}
 
-      {/* Boss Health Bar (Black Warlord Ribbon + Wood Frame) */}
-      {hud.bossActive && (
-        <div className="ts-wood-compact mx-auto mb-auto mt-1 w-full max-w-lg">
-          <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
-            <div className="ts-ribbon ts-ribbon-Black font-display text-xs font-bold">
-              {hud.bossName}
-            </div>
-            <span className="font-mono-tabular text-[11px] font-bold text-[#FDE68A]">{hud.bossPhaseLabel}</span>
-          </div>
-
-          {hud.bossShield > 0 && (
-            <div className="mb-1 flex items-center gap-2">
-              <span className="w-16 font-mono-tabular text-[10px] font-bold text-purple-200">RGB SHIELD</span>
-              <div className="ts-bar-frame h-3 flex-1 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 transition-all duration-150"
-                  style={{ width: `${(hud.bossShield / hud.bossMaxShield) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <span className="w-16 font-mono-tabular text-[10px] font-bold text-red-200">WARLORD HP</span>
-            <div className="ts-bar-frame h-4 flex-1 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-red-600 to-orange-500 transition-all duration-150"
-                style={{ width: `${(hud.bossHp / hud.bossMaxHp) * 100}%` }}
-              />
-            </div>
-            <span className="w-10 text-right font-mono-tabular text-[11px] font-bold text-[#FEF3C7]">{hud.bossHp}</span>
-          </div>
-        </div>
-      )}
-
       {/* Bottom Perimeter: Wooden Action Bar + Nearby Banner */}
       <div className="flex items-end justify-between gap-4">
         <div className="ts-wood-compact flex items-center gap-3 text-xs text-[#FEF3C7]">
@@ -226,7 +191,7 @@ export function GameHud({ hud, muted, onToggleMute, onPause, onOpenStoreModal }:
                   referrerPolicy="no-referrer"
                   className="pixelated h-4 w-4"
                 />
-                <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[11px] text-[#BAE6FD]">J</kbd>
+                <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[11px] text-[#BAE6FD]">O</kbd>
                 <span className="font-semibold">{hud.heroForm === 'pawn' ? 'Hammer' : 'Slash'}</span>
               </div>
               <span aria-hidden="true" className="text-[#a88a5d]">·</span>
@@ -239,7 +204,7 @@ export function GameHud({ hud, muted, onToggleMute, onPause, onOpenStoreModal }:
                 <>
                   <span aria-hidden="true" className="text-[#a88a5d]">·</span>
                   <div className="flex items-center gap-1.5">
-                    <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[11px] text-[#FDE68A]">K</kbd>
+                    <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[11px] text-[#FDE68A]">P</kbd>
                     <span className={hud.specialReadyPct >= 100 ? 'font-bold text-[#FDE68A]' : 'text-[#c2a47e]'}>
                       {hud.hasXessSurge ? 'NPU + XeSS Surge' : 'NPU Heal Pulse'}
                     </span>

@@ -223,7 +223,7 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
     portrait: 'ecore_steward',
     avatarIdx: 4,
     factionColor: 'Blue',
-    text: 'Onward! Cross Copper Bus Plaza north: visit the Offline Study Monastery on the WEST for NPU Heal Pulse, and the Yellow Arc Archery Arena on the EAST for Frame Surge. Swing your blade with [J] and raise Guard Dash with [Space]!',
+    text: 'Onward! Cross Copper Bus Plaza north: visit the Offline Study Monastery on the WEST for NPU Heal Pulse, and the Yellow Arc Archery Arena on the EAST for Frame Surge. Swing your blade with [O] and raise Guard Dash with [Space]!',
   },
 
   // WEST DISTRICT: NPU MONASTERY & OFFLINE STUDY LIBRARY
@@ -248,7 +248,7 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
     text: 'I sustain continuous AI across 300+ supported apps right on your device—no cloud fees, total privacy, and tiny wattage so your battery endures past 20+ hours!',
     choices: [
       {
-        label: 'Bestow the NPU Heal & Shockwave Pulse! [Unlock K]',
+        label: 'Bestow the NPU Heal & Shockwave Pulse! [Unlock P]',
         nextNodeId: 'npu_unlocked',
         effect: {
           unlockNpuPulse: true,
@@ -281,11 +281,11 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
   npu_unlocked: {
     id: 'npu_unlocked',
     speaker: 'Byte (Blue Warrior)',
-    role: 'Power Unlocked: [K] NPU Pulse',
+    role: 'Power Unlocked: [P] NPU Pulse',
     portrait: 'agent',
     avatarIdx: 1,
     factionColor: 'Blue',
-    text: 'NPU Pulse ready! Pressing [K] channels Monk healing light that shatters enemy lag shields, restores vitality, and frees trapped Gold & Wood tasks!',
+    text: 'NPU Pulse ready! Pressing [P] channels Monk healing light that shatters enemy lag shields, restores vitality, and frees trapped Gold & Wood tasks!',
   },
 
   // EAST DISTRICT: ARC XeSS ARCHERY ARENA
@@ -327,7 +327,7 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
     portrait: 'arc_warden',
     avatarIdx: 13,
     factionColor: 'Yellow',
-    text: 'XeSS Frame Surge equipped! Your sword strikes faster and [K] ignites a 120 FPS aura. With both NPU and Arc powers forged, storm NORTH into the Black Colosseum!',
+    text: 'XeSS Frame Surge equipped! Your sword strikes faster and [P] ignites a 120 FPS aura. With both NPU and Arc powers forged, storm NORTH into the Black Colosseum!',
   },
 
   // NORTH DISTRICT: BOSS COLOSSEUM
@@ -349,10 +349,10 @@ export const STORY_DIALOGUES: Record<string, DialogueStep> = {
     portrait: 'agent',
     avatarIdx: 1,
     factionColor: 'Blue',
-    text: 'Time to breach that Black Citadel! Guard-dash red floor slams and Archer volleys with [Space], shatter its RGB shield with [K], and strike with [J]!',
+    text: 'Time to breach that Black Citadel! Guard-dash red floor slams and Archer volleys with [Space], shatter its RGB shield with [P], and strike with [O]!',
     onCompleteEffect: {
       startBossFight: true,
-      questLabel: 'Defeat the Black Lag Titan! [J] Slash · [K] NPU/XeSS · [Space] Guard Dash',
+      questLabel: 'Defeat the Black Lag Titan! [O] Slash · [P] NPU/XeSS · [Space] Guard Dash',
     },
   },
 

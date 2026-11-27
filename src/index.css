@@ -3,6 +3,8 @@
 @layer base {
   :root {
     --font-editorial: "Bricolage Grotesque", sans-serif;
+    --font-hand-display: "Caveat", cursive;
+    --font-hand-body: "Kalam", cursive;
     --font-display: "Chakra Petch", sans-serif;
     --font-sans: "Plus Jakarta Sans", sans-serif;
     --font-mono: "JetBrains Mono", monospace;
@@ -41,6 +43,20 @@
   font-family: var(--font-editorial);
 }
 
+.font-hand-display {
+  font-family: var(--font-hand-display);
+}
+
+.font-hand-body {
+  font-family: var(--font-hand-body);
+}
+
+.landing-sketch-root {
+  font-family: var(--font-sans);
+  background-image: radial-gradient(rgba(17, 24, 39, 0.055) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
 .font-display {
   font-family: var(--font-display);
 }
@@ -66,15 +82,217 @@
   }
 }
 
+@keyframes heroGifLoop {
+  0% {
+    transform: scale(1.03) translate3d(0%, 0%, 0);
+    filter: brightness(1) saturate(1.04);
+  }
+  25% {
+    transform: scale(1.08) translate3d(-1.4%, -0.8%, 0);
+    filter: brightness(1.07) saturate(1.12);
+  }
+  50% {
+    transform: scale(1.11) translate3d(1.1%, -1.3%, 0);
+    filter: brightness(1.03) saturate(1.08);
+  }
+  75% {
+    transform: scale(1.06) translate3d(0.9%, 0.7%, 0);
+    filter: brightness(1.09) saturate(1.14);
+  }
+  100% {
+    transform: scale(1.03) translate3d(0%, 0%, 0);
+    filter: brightness(1) saturate(1.04);
+  }
+}
+
+@keyframes heroPulseEcho {
+  0%,
+  100% {
+    opacity: 0.14;
+    transform: scale(1.06) translate3d(0.6%, 0, 0);
+  }
+  50% {
+    opacity: 0.36;
+    transform: scale(1.13) translate3d(-0.8%, -0.6%, 0);
+  }
+}
+
+@keyframes heroLightSweep {
+  0% {
+    transform: translateX(-140%) skewX(-22deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.55;
+  }
+  65% {
+    transform: translateX(180%) skewX(-22deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(180%) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+@keyframes heroPlayBob {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.03);
+  }
+}
+
+@keyframes heroEmberRise {
+  0% {
+    transform: translateY(18px) scale(0.7);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-110px) scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes arcadeBulbPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes doodleDrift {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(1.5deg);
+  }
+}
+
+@keyframes pulseRoute {
+  0% {
+    stroke-dashoffset: 64;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes heatRipple {
+  0% {
+    transform: translateY(4px) scale(0.95);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateY(-6px) scale(1.06);
+    opacity: 0.72;
+  }
+  100% {
+    transform: translateY(-14px) scale(1.12);
+    opacity: 0;
+  }
+}
+
+@keyframes fanShake {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  20% {
+    transform: translate(-1.5px, 1px) rotate(90deg);
+  }
+  40% {
+    transform: translate(1.5px, -1px) rotate(180deg);
+  }
+  60% {
+    transform: translate(-1px, -1.5px) rotate(270deg);
+  }
+  80% {
+    transform: translate(1.5px, 1px) rotate(340deg);
+  }
+}
+
+@keyframes fanSpinSlow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .animate-arcade-expand {
-  animation: arcadeExpandIn 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: arcadeExpandIn 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-hero-gif {
+  animation: heroGifLoop 6.5s ease-in-out infinite;
+}
+
+.animate-hero-echo {
+  animation: heroPulseEcho 3.4s ease-in-out infinite;
+}
+
+.animate-hero-sweep {
+  animation: heroLightSweep 4.2s ease-in-out infinite;
+}
+
+.animate-hero-play-bob {
+  animation: heroPlayBob 2.2s ease-in-out infinite;
+}
+
+.animate-hero-ember {
+  animation: heroEmberRise 2.8s ease-out infinite;
+}
+
+.animate-doodle-drift {
+  animation: doodleDrift 5.5s ease-in-out infinite;
+}
+
+.animate-pulse-route {
+  stroke-dasharray: 10 6;
+  animation: pulseRoute 1.3s linear infinite;
+}
+
+.animate-heat-ripple {
+  animation: heatRipple 1.6s ease-out infinite;
+}
+
+.animate-fan-shake {
+  animation: fanShake 0.35s linear infinite;
+}
+
+.animate-fan-spin {
+  animation: fanSpinSlow 3.6s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  .animate-arcade-expand {
+  .animate-arcade-expand,
+  .animate-hero-gif,
+  .animate-hero-echo,
+  .animate-hero-sweep,
+  .animate-hero-play-bob,
+  .animate-hero-ember,
+  .animate-doodle-drift,
+  .animate-pulse-route,
+  .animate-heat-ripple,
+  .animate-fan-shake,
+  .animate-fan-spin {
     animation: none;
   }
 }

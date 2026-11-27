@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Shield } from 'lucide-react';
 import { INTEL_HARDWARE_URLS, PORTRAIT_AVATAR_MAP, TINY_SWORDS_AVATARS, TINY_SWORDS_UI } from '../game/assets';
 import { gameAudio } from '../game/audio';
@@ -11,10 +11,22 @@ interface DialogueModalProps {
 }
 
 export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModalProps) {
+  const [sentenceIndex, setSentenceIndex] = useState(0);
   const [visibleChars, setVisibleChars] = useState(0);
   const [imgErr, setImgErr] = useState(false);
 
-  const isTypingDone = visibleChars >= step.text.length;
+  const sentences = useMemo(() => {
+    const parts = step.text
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return parts.length > 0 ? parts : [step.text];
+  }, [step.text]);
+
+  const currentSentence = sentences[sentenceIndex] ?? step.text;
+  const isTypingDone = visibleChars >= currentSentence.length;
+  const isLastSentence = sentenceIndex >= sentences.length - 1;
+
   const fallbackInfo = PORTRAIT_AVATAR_MAP[step.portrait];
   const avatarIdx = step.avatarIdx ?? fallbackInfo.avatarIdx;
   const ribbonColor = step.factionColor ?? fallbackInfo.ribbonColor;
@@ -30,11 +42,16 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
         : INTEL_HARDWARE_URLS.chip;
 
   useEffect(() => {
+    setSentenceIndex(0);
     setVisibleChars(0);
     setImgErr(false);
+  }, [step]);
+
+  useEffect(() => {
+    setVisibleChars(0);
     const interval = window.setInterval(() => {
       setVisibleChars((prev) => {
-        if (prev >= step.text.length) {
+        if (prev >= currentSentence.length) {
           window.clearInterval(interval);
           return prev;
         }
@@ -54,7 +71,7 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
     }, 18);
 
     return () => window.clearInterval(interval);
-  }, [step]);
+  }, [step, sentenceIndex, currentSentence]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -63,7 +80,16 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
       if (!isTypingDone) {
         if (['Space', 'Enter', 'KeyE'].includes(e.code)) {
           e.preventDefault();
-          setVisibleChars(step.text.length);
+          setVisibleChars(currentSentence.length);
+        }
+        return;
+      }
+
+      if (!isLastSentence) {
+        if (['Space', 'Enter', 'KeyE'].includes(e.code)) {
+          e.preventDefault();
+          setSentenceIndex((prev) => prev + 1);
+          setVisibleChars(0);
         }
         return;
       }
@@ -90,7 +116,18 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isTypingDone, step, onAdvance, onSelectChoice]);
+  }, [isTypingDone, isLastSentence, currentSentence, step, onAdvance, onSelectChoice]);
+
+  const handlePrimaryClick = () => {
+    if (!isTypingDone) {
+      setVisibleChars(currentSentence.length);
+    } else if (!isLastSentence) {
+      setSentenceIndex((prev) => prev + 1);
+      setVisibleChars(0);
+    } else {
+      onAdvance();
+    }
+  };
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-30 flex justify-center p-3 md:p-5">
@@ -127,10 +164,10 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
             {/* Parchment Dialogue Copy + Choices */}
             <div className="min-w-0 flex-1">
               <p className="min-h-[3.5rem] text-sm font-medium leading-relaxed text-[#2B1B12] md:text-base">
-                {step.text.slice(0, visibleChars)}
+                {currentSentence.slice(0, visibleChars)}
               </p>
 
-              {isTypingDone && step.choices && step.choices.length > 0 ? (
+              {isTypingDone && isLastSentence && step.choices && step.choices.length > 0 ? (
                 <div className="mt-3 space-y-2">
                   {step.choices.map((choice, idx) => (
                     <button
@@ -147,16 +184,13 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
                   ))}
                 </div>
               ) : (
-                <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <span className="font-mono-tabular text-xs font-semibold text-[#6E492D]">
+                    {sentences.length > 1 ? `Sentence ${sentenceIndex + 1} / ${sentences.length}` : ''}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!isTypingDone) {
-                        setVisibleChars(step.text.length);
-                      } else {
-                        onAdvance();
-                      }
-                    }}
+                    onClick={handlePrimaryClick}
                     className="ts-btn-blue inline-flex items-center gap-2 font-display text-xs font-bold text-white whitespace-nowrap shrink-0"
                   >
                     <img
@@ -165,8 +199,8 @@ export function DialogueModal({ step, onAdvance, onSelectChoice }: DialogueModal
                       referrerPolicy="no-referrer"
                       className="pixelated h-4 w-4"
                     />
-                    <span>{isTypingDone ? 'Continue' : 'Skip'}</span>
-                    <kbd className="font-mono-tabular text-[11px] text-[#FDE68A]">[E / Enter]</kbd>
+                    <span>{!isTypingDone ? 'Skip' : !isLastSentence ? 'Next' : 'Continue'}</span>
+                    <kbd className="font-mono-tabular text-[11px] text-[#FDE68A]">[E]</kbd>
                   </button>
                 </div>
               )}

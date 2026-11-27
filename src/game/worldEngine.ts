@@ -393,6 +393,8 @@ export class SiliconWorldEngine {
   private specialBuffer = 0;
   private interactBuffer = 0;
   private cloudShadowCache = new Map<number, HTMLCanvasElement>();
+  private blurCanvas: HTMLCanvasElement | null = null;
+  private blurCtx: CanvasRenderingContext2D | null = null;
 
   constructor(canvas: HTMLCanvasElement, callbacks: WorldEngineCallbacks) {
     this.canvas = canvas;
@@ -565,14 +567,14 @@ export class SiliconWorldEngine {
       gameAudio.playUnlock();
       this.spawnSpriteFx('healEffect', this.player.wx, this.player.wy, 150, 0.75);
       this.spawnBurstWorld(this.player.wx, this.player.wy, '#00C7FD', 22);
-      this.spawnFloatingText(this.player.wx, this.player.wy - 0.6, 'NPU PULSE UNLOCKED [K]', '#00C7FD');
+      this.spawnFloatingText(this.player.wx, this.player.wy - 0.6, 'NPU PULSE UNLOCKED [P]', '#00C7FD');
       if (this.player.hasXessSurge) {
         this.openBossGate();
         this.objectiveText = 'North Black Colosseum OPEN! Defeat the Lag Titan';
         this.showBanner('ALL CORES SYNCED · COLOSSEUM BRIDGE OPEN!', 3.0);
       } else {
         this.objectiveText = 'East Island: Visit Yellow Arc XeSS Archery [E]';
-        this.showBanner('UNLOCKED [K] NPU HEAL PULSE', 2.6);
+        this.showBanner('UNLOCKED [P] NPU HEAL PULSE', 2.6);
       }
     }
     if (effect.unlockXessSurge) {
@@ -581,7 +583,7 @@ export class SiliconWorldEngine {
       gameAudio.playUnlock();
       this.spawnSpriteFx('explosion2', this.player.wx, this.player.wy, 140, 0.58);
       this.spawnBurstWorld(this.player.wx, this.player.wy, '#22D3EE', 22);
-      this.spawnFloatingText(this.player.wx, this.player.wy - 0.6, 'XeSS SURGE UNLOCKED [K]', '#22D3EE');
+      this.spawnFloatingText(this.player.wx, this.player.wy - 0.6, 'XeSS SURGE UNLOCKED [P]', '#22D3EE');
       if (this.player.hasNpuPulse) {
         this.openBossGate();
         this.objectiveText = 'North Black Colosseum OPEN! Defeat the Lag Titan';
@@ -711,7 +713,7 @@ export class SiliconWorldEngine {
     }
 
     if (this.phase === 'PLAYING' || this.phase === 'EXPO_PARK' || this.phase === 'PAUSED') {
-      if (code === 'Escape' || code === 'KeyP') {
+      if (code === 'Escape') {
         e.preventDefault();
         this.callbacks.onTogglePause();
         return;
@@ -727,11 +729,11 @@ export class SiliconWorldEngine {
     this.heldKeys.add(code);
 
     if (!e.repeat) {
-      if (code === 'KeyJ' || code === 'KeyZ') {
+      if (code === 'KeyO' || code === 'KeyZ') {
         this.attackBuffer = 0.14;
       } else if (code === 'Space' || code === 'ShiftLeft' || code === 'ShiftRight') {
         this.dashBuffer = 0.14;
-      } else if (code === 'KeyK' || code === 'KeyX') {
+      } else if (code === 'KeyP' || code === 'KeyX') {
         this.specialBuffer = 0.14;
       } else if (code === 'KeyE' || code === 'Enter') {
         this.interactBuffer = 0.16;
@@ -1562,7 +1564,9 @@ export class SiliconWorldEngine {
     this.camY += (pPy + this.lookAheadY - this.camY) * Math.min(1, dt * 7);
 
     const dist = this.getCurrentDistrict();
-    this.targetZoom = dist === 'BOSS_COLOSSEUM' ? 0.85 : this.zone === 'EXPO_PARK' ? 1.04 : 1.0;
+    const fitScale = Math.min(1, Math.max(0.68, Math.min(this.viewW / 1040, this.viewH / 580)));
+    const baseZoom = dist === 'BOSS_COLOSSEUM' ? 0.85 : this.zone === 'EXPO_PARK' ? 1.0 : 0.96;
+    this.targetZoom = baseZoom * fitScale;
 
     if (dist !== this.prevDistrict) {
       this.prevDistrict = dist;
@@ -1721,7 +1725,8 @@ export class SiliconWorldEngine {
     }
     this.camX += (this.player.wx * TILE_SIZE - this.camX) * Math.min(1, dt * 4);
     this.camY += (this.player.wy * TILE_SIZE - this.camY) * Math.min(1, dt * 4);
-    this.targetZoom = 0.94;
+    const fitScale = Math.min(1, Math.max(0.68, Math.min(this.viewW / 1040, this.viewH / 580)));
+    this.targetZoom = 0.92 * fitScale;
     this.camZoom += (this.targetZoom - this.camZoom) * Math.min(1, dt * 4);
     this.updateParticles(dt);
   }
@@ -2495,7 +2500,7 @@ export class SiliconWorldEngine {
         nearbyPrompt =
           nearNpc.kind === 'boss_gate' ? '[E] Inspect Colosseum Gate' : `[E] Talk to ${nearNpc.name}`;
       } else if (nearTask) {
-        nearbyPrompt = `[E / J] Rescue ${nearTask.label}`;
+        nearbyPrompt = `[E / O] Rescue ${nearTask.label}`;
       } else if (nearHw) {
         nearbyPrompt = `[E / Click] Inspect ${INTEL_HARDWARE_SPECS[nearHw.hardwareKey].title}`;
       }
@@ -3087,6 +3092,26 @@ export class SiliconWorldEngine {
       draw: () => {
         const px = this.player.wx * TILE_SIZE;
         const py = this.player.wy * TILE_SIZE;
+
+        // Ground stagelight pool beneath Byte (broad, ultra-soft wash)
+        ctx.save();
+        ctx.translate(px, py + 4);
+        ctx.scale(1.3, 0.72);
+        const poolGrad = ctx.createRadialGradient(0, 0, 18, 0, 0, 155);
+        if (this.player.xessBuffTimer > 0) {
+          poolGrad.addColorStop(0, 'rgba(186, 230, 253, 0.16)');
+          poolGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.06)');
+        } else {
+          poolGrad.addColorStop(0, 'rgba(255, 248, 224, 0.14)');
+          poolGrad.addColorStop(0.5, 'rgba(253, 230, 138, 0.05)');
+        }
+        poolGrad.addColorStop(1, 'rgba(255, 248, 224, 0)');
+        ctx.fillStyle = poolGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 155, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
         this.drawTinyShadow(ctx, atlas, px, py + 5, 56);
         const flashAlpha =
           this.player.invulnTimer > 0 && Math.floor(this.elapsed * 18) % 2 === 0 ? 0.5 : 1;
@@ -3119,6 +3144,22 @@ export class SiliconWorldEngine {
           hitFlash: this.player.hitFlash > 0,
           alpha: flashAlpha,
         });
+
+        // Subtle wide overhead stagelight wash (diffused, no hard edges)
+        ctx.save();
+        const beamGrad = ctx.createLinearGradient(px - 40, py - 280, px, py + 36);
+        beamGrad.addColorStop(0, 'rgba(255, 251, 235, 0)');
+        beamGrad.addColorStop(0.5, 'rgba(255, 249, 224, 0.025)');
+        beamGrad.addColorStop(1, 'rgba(255, 248, 220, 0.045)');
+        ctx.fillStyle = beamGrad;
+        ctx.beginPath();
+        ctx.moveTo(px - 110, py - 280);
+        ctx.lineTo(px + 80, py - 280);
+        ctx.lineTo(px + 150, py + 36);
+        ctx.lineTo(px - 150, py + 36);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
 
         if (this.player.xessBuffTimer > 0) {
           ctx.strokeStyle = 'rgba(34, 211, 238, 0.85)';
@@ -3212,20 +3253,100 @@ export class SiliconWorldEngine {
 
     ctx.restore();
 
-    // Subtle atmospheric vignette in Trap Alley / Colosseum
-    if (dist === 'TRAP_ALLEY' && !this.trapCompleted) {
-      const grad = ctx.createRadialGradient(vw / 2, vh / 2, vw * 0.28, vw / 2, vh / 2, vw * 0.72);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, 'rgba(127, 29, 29, 0.38)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, vw, vh);
-    } else if (dist === 'BOSS_COLOSSEUM') {
-      const grad = ctx.createRadialGradient(vw / 2, vh / 2, vw * 0.3, vw / 2, vh / 2, vw * 0.75);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, 'rgba(15, 23, 42, 0.42)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, vw, vh);
+    const heroSx =
+      (this.player.wx * TILE_SIZE - this.camX) * this.camZoom + vw / 2 + shakeX + trapJitter;
+    const heroSy =
+      (this.player.wy * TILE_SIZE - 26 - this.camY) * this.camZoom + vh / 2 + shakeY;
+    this.renderSpotlightAndBlur(ctx, vw, vh, heroSx, heroSy, dist);
+  }
+
+  private renderSpotlightAndBlur(
+    ctx: CanvasRenderingContext2D,
+    vw: number,
+    vh: number,
+    heroSx: number,
+    heroSy: number,
+    dist: DistrictId
+  ): void {
+    if (vw <= 0 || vh <= 0 || this.canvas.width <= 0 || this.canvas.height <= 0) return;
+
+    // 1. Wide, ultra-smooth peripheral depth blur (keeps a broad clear field around Byte)
+    const bw = Math.max(180, Math.round(vw * 0.3));
+    const bh = Math.max(100, Math.round(vh * 0.3));
+    if (!this.blurCanvas) {
+      this.blurCanvas = document.createElement('canvas');
+      this.blurCtx = this.blurCanvas.getContext('2d');
     }
+    if (this.blurCanvas.width !== bw || this.blurCanvas.height !== bh) {
+      this.blurCanvas.width = bw;
+      this.blurCanvas.height = bh;
+    }
+
+    const bctx = this.blurCtx;
+    if (bctx) {
+      bctx.save();
+      bctx.globalCompositeOperation = 'source-over';
+      bctx.fillStyle = '#070d1a';
+      bctx.fillRect(0, 0, bw, bh);
+      bctx.filter = 'blur(2px)';
+      bctx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height, 0, 0, bw, bh);
+      bctx.filter = 'none';
+
+      // Smooth wide diagonal fade so blur stretches gently toward outer corners
+      bctx.globalCompositeOperation = 'destination-out';
+      const sx = heroSx * (bw / vw);
+      const sy = heroSy * (bh / vh);
+      const bDiag = Math.hypot(bw, bh);
+      const clearR = bDiag * 0.27;
+      const blurFullR = bDiag * 0.9;
+      const eraseGrad = bctx.createRadialGradient(sx, sy, clearR, sx, sy, blurFullR);
+      eraseGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+      eraseGrad.addColorStop(0.18, 'rgba(0, 0, 0, 0.94)');
+      eraseGrad.addColorStop(0.38, 'rgba(0, 0, 0, 0.78)');
+      eraseGrad.addColorStop(0.58, 'rgba(0, 0, 0, 0.54)');
+      eraseGrad.addColorStop(0.78, 'rgba(0, 0, 0, 0.28)');
+      eraseGrad.addColorStop(0.92, 'rgba(0, 0, 0, 0.09)');
+      eraseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      bctx.fillStyle = eraseGrad;
+      bctx.fillRect(0, 0, bw, bh);
+      bctx.restore();
+
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(this.blurCanvas, 0, 0, bw, bh, 0, 0, vw, vh);
+      ctx.restore();
+    }
+
+    const vDiag = Math.hypot(vw, vh);
+
+    // 2. Wide, ultra-soft ambient stagelight wash across the arena (no concentrated spotlight disc)
+    const spotRadius = vDiag * 0.52;
+    const spotGlow = ctx.createRadialGradient(heroSx, heroSy, 28, heroSx, heroSy, spotRadius);
+    spotGlow.addColorStop(0, 'rgba(255, 250, 232, 0.065)');
+    spotGlow.addColorStop(0.35, 'rgba(224, 242, 254, 0.032)');
+    spotGlow.addColorStop(0.72, 'rgba(186, 230, 253, 0.01)');
+    spotGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = spotGlow;
+    ctx.fillRect(0, 0, vw, vh);
+
+    // 3. Single unified, broad, gradual vignette extending cleanly past the screen corners
+    const isTrap = dist === 'TRAP_ALLEY' && !this.trapCompleted;
+    const isBoss = dist === 'BOSS_COLOSSEUM';
+    const rInner = vDiag * 0.22;
+    const rOuter = vDiag * 0.92;
+    const darkVig = ctx.createRadialGradient(heroSx, heroSy, rInner, heroSx, heroSy, rOuter);
+    darkVig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    darkVig.addColorStop(0.18, isTrap ? 'rgba(42, 8, 14, 0.04)' : 'rgba(6, 10, 22, 0.03)');
+    darkVig.addColorStop(0.38, isTrap ? 'rgba(46, 9, 16, 0.12)' : 'rgba(5, 8, 20, 0.09)');
+    darkVig.addColorStop(0.58, isTrap ? 'rgba(42, 7, 14, 0.24)' : 'rgba(4, 7, 18, 0.20)');
+    darkVig.addColorStop(0.78, isTrap ? 'rgba(32, 5, 11, 0.40)' : 'rgba(3, 6, 16, 0.35)');
+    darkVig.addColorStop(0.92, isTrap ? 'rgba(24, 4, 9, 0.54)' : 'rgba(2, 5, 14, 0.48)');
+    darkVig.addColorStop(
+      1,
+      isTrap ? 'rgba(18, 3, 7, 0.64)' : isBoss ? 'rgba(2, 5, 14, 0.66)' : 'rgba(2, 5, 14, 0.58)'
+    );
+    ctx.fillStyle = darkVig;
+    ctx.fillRect(0, 0, vw, vh);
   }
 
   private renderTinySwordsIslands(

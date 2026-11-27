@@ -140,7 +140,7 @@ export function TitleScreen({ muted, onStart, onToggleMute, onExitArcade }: Titl
       <div className="relative z-10 px-6 pb-4 md:px-10">
         <div className="ts-wood-compact flex flex-wrap items-center justify-between gap-4 text-xs text-[#FEF3C7]">
           <span className="font-mono-tabular font-semibold">
-            WASD / Arrows Move · J / Z Slash · K / X NPU & XeSS · Space Guard Dash · E Interact · Esc Pause
+            WASD / Arrows Move · O / Z Slash · P / X NPU & XeSS · Space Guard Dash · E Interact · Esc Pause
           </span>
           <span className="font-semibold text-[#FDE68A]">Keyboard Playable · Offline Ready</span>
         </div>

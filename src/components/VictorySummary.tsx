@@ -66,7 +66,7 @@ export function VictorySummary({
               Byte took heavy hits from the Black Citadel—use{' '}
               <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[#BAE6FD]">Space</kbd>{' '}
               to Guard Dash through red slams and{' '}
-              <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[#FDE68A]">K</kbd>{' '}
+              <kbd className="rounded bg-[#3e2618] px-1.5 py-0.5 font-mono-tabular text-[#FDE68A]">P</kbd>{' '}
               to shatter its RGB shield!
             </p>
             <button
@@ -207,7 +207,7 @@ export function VictorySummary({
               <div className="rounded border-2 border-[#a88a5d] bg-[#dfd0ac] p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h3 className="font-display text-base font-bold text-[#2B1B12]">Demo Station Locator</h3>
-                  <span className="text-xs font-bold text-[#5C3A21]">Intel AI PC Zone</span>
+                  <span className="text-xs font-bold text-[#5C3A21]">Jevtel</span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">

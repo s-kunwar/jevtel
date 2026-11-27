@@ -1,21 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, MotionConfig } from 'motion/react';
+import { AiPcForgeSection } from './components/AiPcForgeSection';
 import { ArcadeCabinetModal } from './components/ArcadeCabinetModal';
 import { DialogueModal } from './components/DialogueModal';
 import { ExpoPcModal } from './components/ExpoPcModal';
 import { GameHud } from './components/GameHud';
 import { HardwareDetailModal } from './components/HardwareDetailModal';
 import { HeroGateway } from './components/HeroGateway';
+import { IntroPreloader } from './components/IntroPreloader';
 import { LandingHeader } from './components/LandingHeader';
 import { PauseModal } from './components/PauseModal';
-import { RealityCheckSection } from './components/RealityCheckSection';
 import { RetailActionSection } from './components/RetailActionSection';
-import { ThreePillarsStrip } from './components/ThreePillarsStrip';
 import { TitleScreen } from './components/TitleScreen';
 import { VictorySummary } from './components/VictorySummary';
 import { initTinySwordsUiSkins } from './game/assets';
 import { gameAudio } from './game/audio';
 import { INTEL_HARDWARE_SPECS } from './game/intelHardwareData';
-import { mapNeedChoiceToMatcher, type QuickMatcherAnswers } from './game/landingData';
+import {
+  DEFAULT_BUILDER_CONFIG,
+  mapQuestPcToBuilderConfig,
+  type PcBuilderConfig,
+  type WorkloadScenarioId,
+} from './game/pcBuilderData';
 import { STORY_DIALOGUES } from './game/storyData';
 import type {
   CatalogPcCharacter,
@@ -26,12 +32,6 @@ import type {
   PlayerProfile,
 } from './game/types';
 import { SiliconWorldEngine } from './game/worldEngine';
-
-const DEFAULT_MATCHER_ANSWERS: QuickMatcherAnswers = {
-  work: 'college',
-  battery: 'marathon',
-  priority: 'ultralight',
-};
 
 const INITIAL_HUD: HudSnapshot = {
   zone: 'SILICON_CITY',
@@ -84,11 +84,16 @@ export default function App() {
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [finalProfile, setFinalProfile] = useState<PlayerProfile | null>(null);
   const [muted, setMuted] = useState(false);
+  const [introDone, setIntroDone] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  });
 
-  const [matcherAnswers, setMatcherAnswers] = useState<QuickMatcherAnswers>(
-    DEFAULT_MATCHER_ANSWERS
-  );
-  const [questMatchApplied, setQuestMatchApplied] = useState(false);
+  const [builderConfig, setBuilderConfig] = useState<PcBuilderConfig>(DEFAULT_BUILDER_CONFIG);
+  const [workloadScenario, setWorkloadScenario] = useState<WorkloadScenarioId>('study_ai');
+  const [xessEnabled, setXessEnabled] = useState(true);
+  const [matchSource, setMatchSource] = useState<'builder' | 'quest'>('builder');
+  const [questMatchedPcId, setQuestMatchedPcId] = useState<string | undefined>(undefined);
   const [hasCompletedQuest, setHasCompletedQuest] = useState(false);
 
   const phaseRef = useRef<GamePhase>('TITLE');
@@ -233,8 +238,11 @@ export default function App() {
     setPhase('TITLE');
     engineRef.current?.setArcadeActive(false);
     engineRef.current?.setPhase('TITLE');
-    setMatcherAnswers(DEFAULT_MATCHER_ANSWERS);
-    setQuestMatchApplied(false);
+    setBuilderConfig(DEFAULT_BUILDER_CONFIG);
+    setWorkloadScenario('study_ai');
+    setXessEnabled(true);
+    setMatchSource('builder');
+    setQuestMatchedPcId(undefined);
     setHasCompletedQuest(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -327,19 +335,17 @@ export default function App() {
 
   const handleSendQuestMatchToStore = useCallback(
     (profile: PlayerProfile, matchedPcId: string) => {
-      let nextAnswers = mapNeedChoiceToMatcher(profile.primaryNeed);
-      if (matchedPcId === 'pc_apex_frame') {
-        nextAnswers = { work: 'gaming', battery: 'standard', priority: 'performance' };
+      const nextBuilder = mapQuestPcToBuilderConfig(matchedPcId);
+      setBuilderConfig(nextBuilder);
+      if (profile.primaryNeed === 'gaming' || matchedPcId === 'pc_apex_frame') {
+        setWorkloadScenario('gaming_xess');
       } else if (matchedPcId === 'pc_canvas_studio') {
-        nextAnswers = { work: 'creator', battery: 'full_day', priority: 'performance' };
-      } else if (matchedPcId === 'pc_flowcraft_pro') {
-        nextAnswers = { work: 'coding', battery: 'full_day', priority: 'balanced' };
-      } else if (matchedPcId === 'pc_feather_air' || matchedPcId === 'pc_campus_dash') {
-        nextAnswers = { work: 'college', battery: 'marathon', priority: 'ultralight' };
+        setWorkloadScenario('creator_4k');
+      } else {
+        setWorkloadScenario('study_ai');
       }
-
-      setMatcherAnswers(nextAnswers);
-      setQuestMatchApplied(true);
+      setQuestMatchedPcId(matchedPcId);
+      setMatchSource('quest');
       setHasCompletedQuest(true);
       setShowStoreModal(false);
       setArcadeOpen(false);
@@ -368,27 +374,50 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-[#111827]">
-      <LandingHeader onPlayQuest={handleLaunchArcade} />
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen bg-[#FAF8F5] text-[#111827]">
+        <AnimatePresence>
+          {!introDone && (
+            <IntroPreloader
+              onFinish={() => setIntroDone(true)}
+              onStartGame={() => {
+                setIntroDone(true);
+                handleLaunchArcade();
+              }}
+            />
+          )}
+        </AnimatePresence>
 
-      <main>
-        <HeroGateway
-          onLaunchArcade={handleLaunchArcade}
-          hasCompletedQuest={hasCompletedQuest}
-        />
-        <ThreePillarsStrip />
-        <RealityCheckSection />
-        <RetailActionSection
-          answers={matcherAnswers}
-          onChangeAnswers={(next) => {
-            setMatcherAnswers(next);
-            setQuestMatchApplied(false);
-          }}
-          questMatchApplied={questMatchApplied}
-          onLaunchArcade={handleLaunchArcade}
-          onResetSession={handleResetSession}
-        />
-      </main>
+        <div className="landing-sketch-root">
+          <LandingHeader onPlayQuest={handleLaunchArcade} />
+
+          <main>
+            <HeroGateway
+              onLaunchArcade={handleLaunchArcade}
+              hasCompletedQuest={hasCompletedQuest}
+              introReady={introDone}
+              arcadeOpen={arcadeOpen}
+            />
+          <AiPcForgeSection
+            config={builderConfig}
+            onChangeConfig={(next) => {
+              setBuilderConfig(next);
+              setMatchSource('builder');
+            }}
+            scenario={workloadScenario}
+            onChangeScenario={setWorkloadScenario}
+            xessEnabled={xessEnabled}
+            onToggleXess={() => setXessEnabled((prev) => !prev)}
+          />
+          <RetailActionSection
+            builderConfig={builderConfig}
+            matchSource={matchSource}
+            questMatchedPcId={questMatchedPcId}
+            onLaunchArcade={handleLaunchArcade}
+            onResetSession={handleResetSession}
+          />
+        </main>
+      </div>
 
       {/* Expanding Full-Screen Intel Core Ultra Arcade Machine */}
       <ArcadeCabinetModal
@@ -480,6 +509,7 @@ export default function App() {
           />
         )}
       </ArcadeCabinetModal>
-    </div>
+      </div>
+    </MotionConfig>
   );
 }

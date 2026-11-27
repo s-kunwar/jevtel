@@ -384,6 +384,23 @@ class GameAudioEngine {
       this.tone(f, i === 4 ? 0.75 : 0.15, 'triangle', 0.28, 'sfx', undefined, i * 0.11);
     });
   }
+
+  public playArcadeClick(): void {
+    this.init();
+    this.noiseBurst(0.028, 0.28, 2400, 'sfx');
+    this.tone(1480, 0.032, 'square', 0.16, 'sfx', 420);
+    this.tone(360, 0.04, 'triangle', 0.18, 'sfx', 140);
+  }
+
+  public playArcadePowerOn(): void {
+    this.init();
+    // CRT degauss low thump + warm phosphor sweep + crisp Odama-inspired power chime
+    this.tone(72, 0.28, 'sine', 0.34, 'sfx', 38);
+    this.noiseBurst(0.08, 0.16, 1600, 'sfx');
+    this.tone(523.25, 0.16, 'triangle', 0.22, 'sfx', undefined, 0.04);
+    this.tone(659.25, 0.16, 'triangle', 0.2, 'sfx', undefined, 0.11);
+    this.tone(1046.5, 0.34, 'sine', 0.26, 'sfx', 1054, 0.18);
+  }
 }
 
 export const gameAudio = new GameAudioEngine();

@@ -465,19 +465,19 @@ export const RETAILERS: RetailerProfile[] = [
     id: 'croma',
     name: 'Croma',
     floorTip:
-      'Look for the blue Intel AI PC bay near the ultrabook table and inspect the palm-rest sticker.',
+      'Look for the blue Intel AI PC display table and check the sticker on the laptop palm rest.',
   },
   {
     id: 'reliance',
     name: 'Reliance Digital',
     floorTip:
-      'Check the digital price card below the laptop for "Core Ultra" + "16GB" and verify NPU in Task Manager.',
+      'Check the price card below the laptop for "Core Ultra" and at least 16GB memory.',
   },
   {
     id: 'vijaysales',
     name: 'Vijay Sales',
     floorTip:
-      'Ask the floor specialist to demonstrate offline AI or unplug the demo unit to inspect battery efficiency.',
+      'Ask to test offline AI features or unplug the demo laptop to check real battery endurance.',
   },
 ];
 
@@ -491,31 +491,31 @@ export interface StoreChecklistRule {
 export const STORE_FLOOR_CHECKLIST: StoreChecklistRule[] = [
   {
     id: 'sticker',
-    title: 'Core Ultra Metallic Badge',
-    badgeCheck: 'Palm-rest sticker check',
+    title: 'Intel Core Ultra Badge',
+    badgeCheck: 'Palm-rest check',
     howToVerify:
-      'Confirm the silver-and-cobalt "Intel Core Ultra" sticker (Series 2 / Core Ultra 5, 7, or 9)—not older Core i3/i5 entry chips.',
+      'Confirm the silver-and-blue "Intel Core Ultra" badge on the laptop, rather than older entry-level chips.',
   },
   {
     id: 'npu',
-    title: '45–48+ TOPS Dedicated NPU',
-    badgeCheck: 'Ctrl + Shift + Esc -> Performance',
+    title: 'Built-in AI Engine',
+    badgeCheck: 'Task Manager -> Performance',
     howToVerify:
-      'Open Windows Task Manager on the display laptop and verify the "NPU0 — Intel AI Boost" graph sits right beside CPU & GPU.',
+      'Open Performance in Windows Task Manager on the demo unit to confirm the dedicated AI chip sits right alongside the processor and graphics.',
   },
   {
     id: 'ram',
-    title: '16GB+ RAM Floor (Never 8GB)',
-    badgeCheck: 'Spec card / Settings -> About',
+    title: '16GB+ Memory (Skip 8GB)',
+    badgeCheck: 'Settings -> About',
     howToVerify:
-      'Local AI features and 30-tab multitasking thrive on 16GB or 32GB LPDDR5x/DDR5 memory. Skip 8GB bargain configurations.',
+      'Choose 16GB or 32GB of memory so dozens of tabs, video edits, and offline AI stay smooth for years.',
   },
   {
     id: 'evo_arc',
-    title: 'Intel Evo or Arc Graphics Cue',
-    badgeCheck: 'Ports & Graphics check',
+    title: 'All-Day Battery or Intel Arc Graphics',
+    badgeCheck: 'Display card check',
     howToVerify:
-      'For all-day campus mobility look for the Intel Evo Edition badge; for 4K editing or gaming look for Intel Arc Graphics + XeSS.',
+      'Pick Intel Evo for all-day unplugged classes, or Intel Arc graphics if you game or edit 4K video.',
   },
 ];
 

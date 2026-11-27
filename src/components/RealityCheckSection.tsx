@@ -6,6 +6,7 @@ import {
   type RealityWorkload,
   type TimelineMonth,
 } from '../game/landingData';
+import { BatteryLanternDoodle, HandUnderline } from './SketchDoodles';
 
 export function RealityCheckSection() {
   const [month, setMonth] = useState<TimelineMonth>('m12');
@@ -15,21 +16,24 @@ export function RealityCheckSection() {
   const activeMonthMeta = TIMELINE_MONTHS.find((m) => m.id === month) ?? TIMELINE_MONTHS[2];
 
   return (
-    <section id="reality-check" className="bg-[#FAF8F5] py-20 lg:py-28">
-      <div className="mx-auto max-w-[1200px] px-6 md:px-10">
+    <section id="reality-check" className="relative overflow-hidden bg-[#FAF8F5] py-16 lg:py-24">
+      <BatteryLanternDoodle className="animate-doodle-drift absolute top-14 left-5 hidden h-20 w-20 opacity-55 xl:block" />
+
+      <div className="relative mx-auto max-w-[1200px] px-6 md:px-10">
         {/* Header */}
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
-            <div className="text-xs font-semibold tracking-wide text-[#0068B5]">
+            <div className="font-hand-display text-2xl font-bold tracking-wide text-[#0068B5]">
               The 1-Year Reality Check
             </div>
             <h2
-              className="font-editorial mt-2 text-2xl font-bold tracking-tight text-[#111827] md:text-4xl"
+              className="font-editorial mt-1 text-3xl font-bold leading-[1.06] text-[#111827] md:text-5xl"
               style={{ textWrap: 'balance' }}
             >
               Flashy Budget Thin-and-Light vs. Intel Core Ultra AI PC
             </h2>
-            <p className="mt-3 text-base leading-relaxed text-[#4B5563]">
+            <HandUnderline className="mt-1.5 max-w-md" />
+            <p className="mt-4 text-base leading-relaxed text-[#374151] md:text-lg">
               Almost any laptop looks fast in a 5-minute showroom browse. Toggle the timeline and
               workload below to see how architecture holds up across your first year.
             </p>
@@ -39,7 +43,7 @@ export function RealityCheckSection() {
           <div
             role="group"
             aria-label="Ownership timeline"
-            className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-[#E5E7EB] bg-white p-1 self-start"
+            className="inline-flex flex-wrap items-center gap-1 rounded-xl border-2 border-[#111827] bg-white p-1.5 shadow-[3px_3px_0px_#CBD5E1] self-start"
           >
             {TIMELINE_MONTHS.map((item) => {
               const active = item.id === month;
@@ -48,7 +52,7 @@ export function RealityCheckSection() {
                   key={item.id}
                   type="button"
                   onClick={() => setMonth(item.id)}
-                  className={`rounded-md px-3.5 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                  className={`rounded-lg px-3.5 py-2 text-sm font-bold transition-colors whitespace-nowrap shrink-0 ${
                     active
                       ? 'bg-[#0068B5] text-white'
                       : 'text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#111827]'
@@ -65,7 +69,7 @@ export function RealityCheckSection() {
         <div
           role="tablist"
           aria-label="Daily workload type"
-          className="mt-8 flex flex-wrap items-center gap-2"
+          className="mt-8 flex flex-wrap items-center gap-2.5"
         >
           {REALITY_WORKLOADS.map((w) => {
             const active = w.id === workload;
@@ -76,10 +80,10 @@ export function RealityCheckSection() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setWorkload(w.id)}
-                className={`rounded-lg border px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+                className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-colors whitespace-nowrap shrink-0 ${
                   active
-                    ? 'border-[#111827] bg-[#111827] text-white'
-                    : 'border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#9CA3AF] hover:text-[#111827]'
+                    ? 'border-[#111827] bg-[#111827] text-white shadow-[2px_2px_0px_#0068B5]'
+                    : 'border-[#CBD5E1] bg-white text-[#374151] hover:border-[#111827] hover:text-[#111827]'
                 }`}
               >
                 {w.label}
@@ -88,20 +92,20 @@ export function RealityCheckSection() {
           })}
         </div>
 
-        {/* Comparison Plate (Single-level elevation, clean hairline rules) */}
-        <div className="mt-6 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white">
+        {/* Comparison Plate */}
+        <div className="mt-6 overflow-hidden rounded-2xl border-2 border-[#111827] bg-white shadow-[5px_5px_0px_#CBD5E1]">
           {/* Verdict Summary Strip */}
-          <div className="flex flex-col justify-between gap-2 border-b border-[#E5E7EB] bg-[#F8F9FA] px-6 py-4 md:flex-row md:items-center">
-            <div className="font-mono-tabular text-xs font-semibold text-[#0068B5]">
+          <div className="flex flex-col justify-between gap-2 border-b-2 border-dashed border-[#CBD5E1] bg-[#F8F9FA] px-6 py-4 md:flex-row md:items-center">
+            <div className="font-mono-tabular text-xs font-bold text-[#0068B5]">
               {activeMonthMeta.label} · {activeMonthMeta.sub}
             </div>
-            <p className="text-sm font-medium text-[#111827]">{snapshot.summaryVerdict}</p>
+            <p className="text-base font-bold text-[#111827]">{snapshot.summaryVerdict}</p>
           </div>
 
           {/* Rows */}
           <div className="divide-y divide-[#E5E7EB]">
             {/* Column Headers */}
-            <div className="hidden grid-cols-12 gap-4 px-6 py-3.5 text-xs font-semibold text-[#6B7280] md:grid">
+            <div className="hidden grid-cols-12 gap-4 px-6 py-3.5 text-sm font-bold text-[#6B7280] md:grid">
               <div className="col-span-4">Real-World Test</div>
               <div className="col-span-4">Flashy Budget Thin-and-Light</div>
               <div className="col-span-4 text-[#0068B5]">Intel Core Ultra AI PC</div>

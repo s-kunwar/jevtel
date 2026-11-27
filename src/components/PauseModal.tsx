@@ -37,7 +37,7 @@ export function PauseModal({
           <div className="ts-ribbon ts-ribbon-Blue font-display text-sm font-bold">
             QUEST PAUSED
           </div>
-          <span className="font-mono-tabular text-xs font-bold text-[#FDE68A]">Intel AI PC Zone</span>
+          <span className="font-mono-tabular text-xs font-bold text-[#FDE68A]">Jevtel</span>
         </div>
 
         <div className="ts-paper-panel">
@@ -48,11 +48,11 @@ export function PauseModal({
             </div>
             <div className="flex justify-between">
               <span>Warrior Blade Slash</span>
-              <kbd className="font-mono-tabular text-[#00559B]">J / Z</kbd>
+              <kbd className="font-mono-tabular text-[#00559B]">O / Z</kbd>
             </div>
             <div className="flex justify-between">
               <span>NPU Heal / XeSS Surge</span>
-              <kbd className="font-mono-tabular text-[#9A3412]">K / X</kbd>
+              <kbd className="font-mono-tabular text-[#9A3412]">P / X</kbd>
             </div>
             <div className="flex justify-between">
               <span>Guard Dash (Dodge)</span>
