@@ -1,129 +1,339 @@
 # Jevtel — Silicon Quest: Core Ultra
 
-> **GitHub About Description (copy into GitHub repo settings):**  
-> Interactive dual-mode Intel Core Ultra AI PC retail kiosk & playable pixel-art RPG (*Silicon Quest*), featuring a 3-tap shopper matchmaker for Indian retail stores, 3D arcade cabinet, hardware builder, and Gemini-powered voice & text AI advisor (NOVA).
+> **Interactive Intel Core Ultra AI PC Retail Kiosk & Playable Pixel-Art RPG**
+>
+> A dual-mode retail experience combining personalized laptop discovery, interactive hardware exploration, a playable pixel-art adventure, and a Gemini-powered AI shopping advisor.
 
-**Suggested GitHub Topics:** `intel-core-ultra` `gemini-api` `react` `typescript` `threejs` `tailwindcss` `express` `pixel-art-game` `retail-kiosk` `ai-assistant`
+**GitHub About Description**
+
+Interactive dual-mode Intel Core Ultra AI PC retail kiosk featuring a 3-tap shopper matchmaker, 3D arcade cabinet, playable pixel-art RPG (Silicon Quest), hardware builder, and Gemini-powered voice and text AI advisor (NOVA).
+
+**Suggested GitHub Topics**
+
+`intel-core-ultra` `gemini-api` `react` `typescript` `threejs` `tailwindcss` `express` `pixel-art-game` `retail-kiosk` `ai-assistant`
 
 ---
 
 ## Overview
 
-**Jevtel** is a responsive, touch-ready retail showcase built for everyday walk-in shoppers and hardware enthusiasts across Indian retail floors (**Croma**, **Reliance Digital**, and **Vijay Sales**) on both smartphones and storefront kiosks.
+**Jevtel** is a responsive, touch-ready retail showcase designed for everyday shoppers and hardware enthusiasts across Indian retail environments, including **Croma, Reliance Digital, and Vijay Sales**.
 
-It pairs two seamless experiences behind a single top-bar toggle (**Fast Mode | Pro Builder**) alongside **NOVA**, a mode-aware AI shopping & hardware advisor powered server-side by the Gemini API (text chat + real-time spoken voice).
+It brings together two connected experiences through a single top-bar toggle:
+
+- **Fast Mode:** A simplified laptop discovery experience for everyday shoppers.
+- **Pro Builder:** An interactive hardware exploration experience featuring a 3D arcade cabinet and playable RPG.
+
+Alongside both experiences is **NOVA**, a mode-aware AI shopping and hardware advisor powered by the Gemini API, supporting text-based conversations and real-time spoken interaction.
 
 ---
 
 ## Key Features
 
-### 1. Fast Mode *(Default Walk-In Shopper Flow)*
-Designed for non-technical shoppers who want an instant, jargon-free laptop match in under 60 seconds:
-- **01 · Your Day in 3 Taps:** Choose a primary daily life routine (+ optional secondary need), real-world priorities (AI tools, charger-free battery, 4+ year speed), and comfortable INR budget bracket (`Under ₹75,000` to `₹1,20,000+`).
-- **02 · The 60-Second Store Showdown:** Interactive 4-moment stress test (*Out of Box*, *Monday Rush*, *Zero Wi-Fi on Train*, *18 Months Later*) comparing your matched Intel Core Ultra AI PC against a same-price generic lookalike with animated SVG telemetry meters (`Battery Left`, `Heat & Fan Noise`, `Privacy Shield`, `App Reliability`) in a compact slide-over card deck on mobile.
-- **03 · Ask the Store Advisor & 30-Second Verification Check:** Swipeable store cards naming matched Intel Core Ultra Series 1 & Series 2 laptops across **Croma**, **Reliance Digital**, and **Vijay Sales**, a 4-year cost-per-year value breakdown, and an interactive 3-step demo-floor verification checklist.
+### 1. Fast Mode — Default Walk-In Shopper Flow
 
-### 2. Pro Builder & *Silicon Quest* Playable Arcade
-Built for deeper hardware exploration and interactive storytelling:
-- **Functional Cyberpunk Preloader (`IntroPreloader`):** Preloads landing artwork, UI assets, fonts, sprite atlases, 3D cabinet textures, and the CRT YouTube video showcase cleanly before reveal.
-- **Interactive 3D Arcade Cabinet (`HeroArcade3DStage`):** Three.js arcade stage with touch/mouse drag-to-orbit, CRT video preview with mute/tap-for-sound control, and smooth transition into the full arcade experience.
-- **Playable Action-RPG — *Silicon Quest* (`SiliconWorldEngine`):** Top-down pixel-art adventure inside Silicon City where **Byte** battles Lag Titan forces using **Slash**, **NPU Pulse**, **Arc XeSS Surge**, and **Dash**, inspects Intel hardware stations, tours Expo Park, and exports a personalized in-store match. Supports desktop keyboard/mouse and a portrait mobile handheld deck with a dynamic thumbstick and custom arc controls.
-- **5-Slot AI PC Forge (`AiPcForgeSection`):** Interactive processor, graphics, memory, storage, and workload configuration with animated X-ray schematics, live performance meters, and curated retail product matches.
+Designed for non-technical shoppers who want an instant, jargon-free laptop recommendation in under 60 seconds.
 
-### 3. NOVA AI PC Advisor (Text + Real-Time Live Voice)
-- Floating bottom-right drawer (85% height sheet on phones, compact panel on desktop) accessible across both modes.
-- **Context-Aware Guidance:** Automatically adapts between plain-English store friend (*Fast Mode*) and Core Ultra tier advisor (*Pro Builder*).
-- **Text & Real-Time Voice:** Uses `gemini-4-hydrogen` (`ThinkingLevel.LOW`) for chat (`POST /api/nova/chat`) and `gemini-3.8-live` over WebSockets (`WS /api/nova/live`) for bidirectional 16kHz/24kHz PCM audio streaming.
+#### 01 · Your Day in 3 Taps
+
+Users select:
+
+- Their primary daily routine, with an optional secondary need.
+- Real-world priorities such as AI tools, charger-free battery life, and performance over four or more years.
+- A comfortable INR budget bracket, ranging from `Under ₹75,000` to `₹1,20,000+`.
+
+#### 02 · The 60-Second Store Showdown
+
+An interactive four-moment stress test compares the matched Intel Core Ultra AI PC against a same-price generic alternative.
+
+The four scenarios are:
+
+1. **Out of Box**
+2. **Monday Rush**
+3. **Zero Wi-Fi on Train**
+4. **18 Months Later**
+
+Animated SVG telemetry meters display:
+
+- Battery Left
+- Heat & Fan Noise
+- Privacy Shield
+- App Reliability
+
+Results are presented through a compact slide-over card deck optimized for mobile screens.
+
+#### 03 · Ask the Store Advisor & 30-Second Verification Check
+
+Features include:
+
+- Swipeable store cards with matched Intel Core Ultra Series 1 and Series 2 laptops.
+- Product listings across Croma, Reliance Digital, and Vijay Sales.
+- Four-year cost-per-year value breakdown.
+- Interactive three-step demo-floor verification checklist.
+
+### 2. Pro Builder & Silicon Quest Playable Arcade
+
+Built for deeper hardware exploration and interactive storytelling.
+
+#### Cyberpunk Preloader — `IntroPreloader`
+
+Preloads the following assets before revealing the experience:
+
+- Landing artwork and UI assets.
+- Fonts and sprite atlases.
+- 3D cabinet textures.
+- CRT YouTube video showcase.
+
+#### Interactive 3D Arcade Cabinet — `HeroArcade3DStage`
+
+A Three.js-powered arcade stage featuring:
+
+- Mouse and touch drag-to-orbit interaction.
+- CRT video preview.
+- Mute and tap-for-sound controls.
+- Smooth transition into the full arcade experience.
+
+#### Silicon Quest — Playable Action RPG
+
+A top-down pixel-art adventure set inside **Silicon City**.
+
+Players control **Byte**, who battles Lag Titan forces using four abilities:
+
+- **Slash**
+- **NPU Pulse**
+- **Arc XeSS Surge**
+- **Dash**
+
+Players can also:
+
+- Explore Silicon City and Expo Park.
+- Inspect interactive Intel hardware stations.
+- Export a personalized in-store laptop match.
+
+**Supported controls:**
+
+- Desktop: Keyboard and mouse.
+- Mobile: Portrait-oriented handheld deck with dynamic thumbstick and custom arc controls.
+
+#### 5-Slot AI PC Forge — `AiPcForgeSection`
+
+An interactive hardware configurator featuring five slots:
+
+1. Processor
+2. Graphics
+3. Memory
+4. Storage
+5. Workload
+
+Features include animated X-ray schematics, live performance meters, and curated retail product matches.
+
+### 3. NOVA — AI PC Advisor
+
+NOVA is a floating AI advisor available across both Fast Mode and Pro Builder.
+
+**Interface**
+
+- Floating bottom-right drawer.
+- Approximately 85% height sheet on phones.
+- Compact panel on desktop.
+
+**Context-Aware Guidance**
+
+NOVA adapts its responses based on the active mode:
+
+- **Fast Mode:** Plain-English shopping guidance.
+- **Pro Builder:** Core Ultra hardware and configuration guidance.
+
+**Text Chat**
+
+Uses `gemini-4-hydrogen` with `ThinkingLevel.LOW`.
+
+API endpoint:
+
+```http
+POST /api/nova/chat
+```
+
+**Real-Time Live Voice**
+
+Uses `gemini-3.8-live` over WebSockets for bidirectional 16kHz/24kHz PCM audio streaming.
+
+WebSocket endpoint:
+
+```http
+WS /api/nova/live
+```
 
 ### 4. Mobile & Kiosk Safeguards
-- Single-row compact responsive header (`Fast Mode | Pro Builder`, audio mute, light/dark toggle, and expanding mobile menu drawer).
-- 3-minute idle kiosk auto-reset safeguard (`KIOSK_IDLE_TIMEOUT_MS`).
+
+The interface includes:
+
+- Compact single-row responsive header.
+- Fast Mode and Pro Builder toggle.
+- Audio mute control.
+- Light/dark theme toggle.
+- Expanding mobile menu drawer.
+- Three-minute idle kiosk auto-reset safeguard using `KIOSK_IDLE_TIMEOUT_MS`.
 
 ---
 
-## Tech Stack
+## Technology Stack
 
-- **Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS v4, Motion, Three.js, Lucide Icons
-- **Backend:** Node.js, Express, `ws` (WebSocket live audio proxy), `dotenv`
-- **AI SDK:** `@google/genai` (`gemini-4-hydrogen` text chat + `gemini-3.8-live` real-time voice)
+| Component | Technologies |
+|---|---|
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4 |
+| Animation | Motion |
+| 3D | Three.js |
+| Icons | Lucide Icons |
+| Backend | Node.js, Express |
+| WebSocket | `ws` |
+| Environment Configuration | `dotenv` |
+| AI SDK | `@google/genai` |
+| Text AI | `gemini-4-hydrogen` |
+| Real-Time Voice AI | `gemini-3.8-live` |
 
 ---
 
 ## Project Structure
 
 ```text
-├── server.ts                          # Express server + /api/nova/chat + WS /api/nova/live proxy
-├── metadata.json                      # App manifest & SERVER_SIDE_GEMINI_API capability
-├── .env.example                       # Server-side environment variable template
-├── index.html                         # HTML shell & typography imports
-├── public/assets/                     # Preloaded artwork, Tiny Swords sprites & custom UI assets
+├── server.ts
+│   # Express server + /api/nova/chat + WS /api/nova/live proxy
+├── metadata.json
+│   # App manifest & SERVER_SIDE_GEMINI_API capability
+├── .env.example
+│   # Server-side environment variable template
+├── index.html
+│   # HTML shell & typography imports
+├── public/assets/
+│   # Preloaded artwork, Tiny Swords sprites & custom UI assets
 └── src/
-    ├── App.tsx                        # Mode switching, game lifecycle & kiosk idle safeguard
+    ├── App.tsx
+    │   # Mode switching, game lifecycle & kiosk idle safeguard
     ├── components/
-    │   ├── LandingHeader.tsx          # Compact top bar + Fast/Pro mode toggle + mobile drawer
-    │   ├── IntroPreloader.tsx         # Cyberpunk preloader tracking sprite/3D/video readiness
-    │   ├── FastModeExperience.tsx     # 3-tap selector, 60s Showdown & store advisor slide cards
-    │   ├── HeroGateway.tsx            # Pro Builder hero stage wrapper
-    │   ├── HeroArcade3DStage.tsx      # Interactive Three.js 3D arcade cabinet & CRT YouTube API
-    │   ├── AiPcForgeSection.tsx       # Interactive 5-slot hardware configurator & benchmarks
-    │   ├── RetailActionSection.tsx    # Floor match summary & demo verification tools
-    │   ├── PreferenceProductsSection.tsx # Curated store catalog matching active build
-    │   ├── ArcadeCabinetModal.tsx     # Responsive desktop cabinet / mobile portrait handheld deck
-    │   ├── NovaAdvisorChat.tsx        # NOVA floating chat + WebSocket Live Voice console
-    │   └── GameHud.tsx / DialogueModal.tsx / ExpoPcModal.tsx / VictorySummary.tsx
+    │   ├── LandingHeader.tsx
+    │   ├── IntroPreloader.tsx
+    │   ├── FastModeExperience.tsx
+    │   ├── HeroGateway.tsx
+    │   ├── HeroArcade3DStage.tsx
+    │   ├── AiPcForgeSection.tsx
+    │   ├── RetailActionSection.tsx
+    │   ├── PreferenceProductsSection.tsx
+    │   ├── ArcadeCabinetModal.tsx
+    │   ├── NovaAdvisorChat.tsx
+    │   └── GameHud.tsx
+    │       ├── DialogueModal.tsx
+    │       ├── ExpoPcModal.tsx
+    │       └── VictorySummary.tsx
     └── game/
-        ├── fastModeData.ts            # Verified Croma, Reliance Digital & Vijay Sales catalog
-        ├── pcBuilderData.ts           # Core Ultra Forge configurations & workload telemetry
-        ├── retailCatalogData.ts       # Pro catalog SKUs & tier mappings
-        ├── intelHardwareData.ts       # Interactive Expo Park & hardware station specs
-        ├── storyData.ts               # Silicon Quest dialogue tree & match logic
-        ├── worldEngine.ts             # 2D HTML5 Canvas action-RPG engine
+        ├── fastModeData.ts
+        ├── pcBuilderData.ts
+        ├── retailCatalogData.ts
+        ├── intelHardwareData.ts
+        ├── storyData.ts
+        ├── worldEngine.ts
         └── assets.ts / audio.ts / haptics.ts
 ```
 
 ---
 
-## Secure API Key Setup (For Developers & Hackathon Judges)
+## Secure API Key Setup
 
-The Gemini API key is **strictly server-side**—it is never embedded in browser bundles, `vite.config.ts`, or client state, and visitors/judges never need to supply a key to chat with or talk to **NOVA**.
+The Gemini API key is strictly server-side. It is never embedded in browser bundles, `vite.config.ts`, or client state.
 
-### Option A — Google AI Studio Preview & Shared App URL (Recommended)
-1. Ensure **`GEMINI_API_KEY`** is attached in **Settings > Secrets** inside Google AI Studio.
-2. Any judge or visitor opening the shared/deployed URL automatically uses your server-side key through `/api/nova/chat` and `/api/nova/live` without seeing or entering any credentials.
+Visitors and judges accessing a shared or deployed application do not need to provide their own API key when the server-side environment is configured correctly.
 
-### Option B — Hosting From GitHub (Cloud Run, Render, Railway, VPS)
-1. Set `GEMINI_API_KEY` as a **server environment variable / secret** in your hosting dashboard (`Settings` / `Secrets` / `Environment Variables`).
-2. `server.ts` reads `process.env.GEMINI_API_KEY` (with fallback support for `API_KEY` or `GOOGLE_API_KEY` if your host names it that way).
-3. Verify readiness cleanly via `GET /api/nova/status` (returns `{ "ready": true }` without exposing any secret).
+### Option A — Google AI Studio Preview & Shared App URL
+
+1. Ensure `GEMINI_API_KEY` is attached under **Settings → Secrets** inside Google AI Studio.
+2. Open the shared or deployed application URL.
+3. The application uses its server-side key through `/api/nova/chat` and `/api/nova/live`.
+
+### Option B — Hosting From GitHub
+
+For Cloud Run, Render, Railway, or a VPS:
+
+1. Set `GEMINI_API_KEY` as a server environment variable or secret in the hosting dashboard.
+2. `server.ts` reads `process.env.GEMINI_API_KEY`.
+3. Fallback support is available for `API_KEY` or `GOOGLE_API_KEY`.
+4. Verify readiness using:
+
+```http
+GET /api/nova/status
+```
+
+Expected response:
+
+```json
+{
+  "ready": true
+}
+```
+
+The status endpoint returns readiness without exposing the API key.
 
 ### Option C — Local Development
-1. Copy `.env.example` to `.env.local` (both `.env` and `.env.local` are excluded from git via `.gitignore`):
-   ```bash
-   cp .env.example .env.local
-   ```
-2. Add your Gemini API key inside `.env.local`:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-3. Never commit `.env` or `.env.local` to GitHub.
+
+Copy `.env.example` to `.env.local`:
+
+```bash
+cp .env.example .env.local
+```
+
+Add your Gemini API key:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+Both `.env` and `.env.local` are excluded from Git through `.gitignore`.
+
+**Never commit API keys or environment secrets to GitHub.**
 
 ---
 
 ## Running Locally & Deploying
 
+### Install Dependencies
+
 ```bash
-# Install dependencies
 npm install
+```
 
-# Start development server (Express + Vite middleware on port 3000)
+### Start Development Server
+
+```bash
 npm run dev
+```
 
-# Type-check & lint
+Starts the Express server with Vite middleware on port `3000`.
+
+### Type-Check & Lint
+
+```bash
 npm run lint
+```
 
-# Build production frontend bundle
+### Build Production Frontend
+
+```bash
 npm run build
+```
 
-# Start production server (serves dist/ + /api/nova/* on port 3000)
+### Start Production Server
+
+```bash
 npm start
 ```
+
+The production server serves `dist/` and handles `/api/nova/*` on port `3000`.
+
+---
+
+## Jevtel — Silicon Quest: Core Ultra
+
+**Explore the experience through two modes:**
+
+- **Fast Mode** — Discover an Intel Core Ultra laptop through your everyday needs.
+- **Pro Builder** — Explore hardware, configure a PC, and enter Silicon Quest.
+
+**Powered by React, Three.js, Node.js, Express, and Gemini.**
